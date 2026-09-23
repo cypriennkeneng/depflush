@@ -2,20 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleIdentifier</key><string>de.webloupe.aufraeumer</string>
-    <key>CFBundleName</key><string>Aufräumer</string>
-    <key>CFBundleDisplayName</key><string>Aufräumer</string>
-    <key>CFBundleExecutable</key><string>Aufraeumer</string>
+    <key>CFBundleIdentifier</key><string>de.webloupe.depflush</string>
+    <key>CFBundleName</key><string>Depflush</string>
+    <key>CFBundleDisplayName</key><string>Depflush</string>
+    <key>CFBundleExecutable</key><string>Depflush</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.1.0</string>
-    <key>CFBundleVersion</key><string>2</string>
+    <key>CFBundleShortVersionString</key><string>1.2.0</string>
+    <key>CFBundleVersion</key><string>3</string>
     <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>CFBundleLocalizations</key><array><string>de</string><string>en</string><string>fr</string></array>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
     <key>NSHighResolutionCapable</key><true/>
-    <key>NSAppleEventsUsageDescription</key><string>Der Aufräumer bittet den Finder, den Papierkorb zu leeren.</string>
-    <key>NSHumanReadableCopyright</key><string>© 2026 Webloupe</string>
+    <key>NSAppleEventsUsageDescription</key><string>Depflush asks Finder to empty the Trash.</string>
+    <key>NSHumanReadableCopyright</key><string>© 2026 Webloupe · depflush.com</string>
 </dict>
 </plist>

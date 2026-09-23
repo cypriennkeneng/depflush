@@ -578,7 +578,11 @@ struct SettingsView: View {
             }
             Section(L("Über")) {
                 LabeledContent(L("Version"), value: AppInfo.version)
-                LabeledContent(L("Verlauf"), value: "~/Library/Application Support/Aufraeumer")
+                LabeledContent(L("Verlauf"), value: "~/Library/Application Support/Depflush")
+                Link(destination: URL(string: "https://depflush.com")!) { Label("depflush.com", systemImage: "globe") }
+                Link(destination: URL(string: "https://webloupe.de")!) {
+                    Label(L("Entwickelt von Webloupe – Shopware-Entwicklung & Updates"), systemImage: "hammer")
+                }
                 Button(L("Willkommensbildschirm erneut zeigen")) { UserDefaults.standard.set(false, forKey: "welcomeShown") }
             }
         }

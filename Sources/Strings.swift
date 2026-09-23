@@ -4,7 +4,7 @@ import Foundation
 // Neue Texte: L("Deutscher Text") im Code verwenden und hier ergänzen.
 
 enum AppInfo {
-    static var name: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Aufräumer" }
+    static var name: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Depflush" }
     static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0" }
 }
 
@@ -246,4 +246,5 @@ let translations: [String: [String]] = [
     "Version": ["Version", "Version"],
     "Willkommensbildschirm erneut zeigen": ["Show welcome screen again", "Revoir l'écran d'accueil"],
     "Konnte nicht geändert werden: %@": ["Could not be changed: %@", "Modification impossible : %@"],
+    "Entwickelt von Webloupe – Shopware-Entwicklung & Updates": ["Made by Webloupe – Shopware development & updates", "Développé par Webloupe – développement et mises à jour Shopware"],
 ]

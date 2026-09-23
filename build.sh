@@ -1,8 +1,8 @@
 #!/bin/zsh
-# Baut Aufräumer.app und installiert sie nach ~/Applications
+# Baut Depflush.app und installiert sie nach ~/Applications
 set -e
 cd "$(dirname "$0")"
-APP="build/Aufräumer.app"
+APP="build/Depflush.app"
 
 if [ ! -f Resources/AppIcon.icns ]; then
   echo "→ Icon erzeugen"
@@ -21,21 +21,22 @@ rm -rf build; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 # Universal Binary: Apple Silicon + Intel
 for ARCH in arm64 x86_64; do
   swiftc -O -swift-version 5 -target $ARCH-apple-macosx14.0 -parse-as-library \
-    Sources/*.swift -o "build/Aufraeumer-$ARCH"
+    Sources/*.swift -o "build/Depflush-$ARCH"
 done
-lipo -create build/Aufraeumer-arm64 build/Aufraeumer-x86_64 -output "$APP/Contents/MacOS/Aufraeumer"
-rm build/Aufraeumer-arm64 build/Aufraeumer-x86_64
+lipo -create build/Depflush-arm64 build/Depflush-x86_64 -output "$APP/Contents/MacOS/Depflush"
+rm build/Depflush-arm64 build/Depflush-x86_64
 cp Info.plist "$APP/Contents/"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 codesign --force --deep -s - "$APP"
 
 if [ "$1" = "--install" ]; then
   echo "→ Installieren nach ~/Applications"
+  osascript -e 'tell application id "de.webloupe.depflush" to quit' >/dev/null 2>&1 || true
   osascript -e 'tell application id "de.webloupe.aufraeumer" to quit' >/dev/null 2>&1 || true
   sleep 1
   mkdir -p ~/Applications
-  rm -rf ~/Applications/Aufräumer.app
+  rm -rf ~/Applications/Depflush.app
   cp -R "$APP" ~/Applications/
-  open ~/Applications/Aufräumer.app
+  open ~/Applications/Depflush.app
 fi
 echo "✓ Fertig"
