@@ -137,20 +137,20 @@ enum Fmt {
     }
 
     static func gbShort(_ b: Int64) -> String {
-        "\(Int((Double(b) / 1e9).rounded())) GB"
+        L("%d GB", Int((Double(b) / 1e9).rounded()))
     }
 
     static func date(_ d: Date?) -> String {
         guard let d else { return "–" }
         let f = DateFormatter()
-        f.locale = Locale(identifier: "de_DE")
+        f.locale = L10n.locale
         f.dateStyle = .medium
         return f.string(from: d)
     }
 
     static func dateTime(_ d: Date) -> String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "de_DE")
+        f.locale = L10n.locale
         f.dateStyle = .medium
         f.timeStyle = .short
         return f.string(from: d)
@@ -158,7 +158,7 @@ enum Fmt {
 
     static func relative(_ d: Date) -> String {
         let f = RelativeDateTimeFormatter()
-        f.locale = Locale(identifier: "de_DE")
+        f.locale = L10n.locale
         return f.localizedString(for: d, relativeTo: Date())
     }
 }

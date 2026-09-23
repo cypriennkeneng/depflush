@@ -11,7 +11,8 @@ Native macOS-App (SwiftUI) zum regelmäßigen Aufräumen des Speicherplatzes.
 - **Menüleiste**: freier Speicher + Mitteilung unter der Warnschwelle
 - **Verlauf**: `~/Library/Application Support/Aufraeumer/verlauf.json`
 
-Gelöscht wird nur nach Vorschau + Bestätigung, endgültig (nicht in den Papierkorb).
+Gelöscht wird nur nach Vorschau + Bestätigung – standardmäßig in den Papierkorb, optional endgültig.
+Sprachen: DE / EN / FR (`Sources/Strings.swift`, Prüfung mit `python3 tools/l10n_check.py`).
 Geschützte Ordner (Home, Library, Dokumente, Projektordner selbst …) werden nie gelöscht.
 
 ## Bauen & installieren
@@ -19,4 +20,4 @@ Geschützte Ordner (Home, Library, Dokumente, Projektordner selbst …) werden n
 ./build.sh            # baut build/Aufräumer.app
 ./build.sh --install  # baut, kopiert nach ~/Applications und startet
 ```
-Benötigt nur die Xcode Command Line Tools (Swift 6), macOS 14+.
+Benötigt nur die Xcode Command Line Tools (Swift 6), macOS 14+. Baut ein Universal Binary (Apple Silicon + Intel).

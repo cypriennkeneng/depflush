@@ -15,31 +15,32 @@ struct MenuBarPanel: View {
     @EnvironmentObject var disk: DiskMonitor
     @EnvironmentObject var model: CleanerModel
     @Environment(\.openWindow) private var openWindow
+    @AppStorage("language") private var language = "system"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 AppBadge(size: 26)
-                Text("Aufräumer").font(.headline)
+                Text(AppInfo.name).font(.headline)
                 Spacer()
             }
             VStack(alignment: .leading, spacing: 6) {
                 ProgressView(value: disk.usedFraction)
                     .tint(disk.isLow ? .red : .accentColor)
                 HStack {
-                    Text("\(Fmt.bytes(disk.free)) frei").fontWeight(.medium)
+                    Text(L("%@ frei", Fmt.bytes(disk.free))).fontWeight(.medium)
                     Spacer()
-                    Text("von \(Fmt.bytes(disk.total))").foregroundStyle(.secondary)
+                    Text(L("von %@", Fmt.bytes(disk.total))).foregroundStyle(.secondary)
                 }
                 .font(.callout)
             }
             if disk.isLow {
-                Label("Weniger als \(disk.thresholdGB) GB frei – Zeit zum Aufräumen", systemImage: "exclamationmark.triangle.fill")
+                Label(L("Weniger als %d GB frei – Zeit zum Aufräumen", disk.thresholdGB), systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
                     .foregroundStyle(.orange)
             }
             if let last = model.history.first {
-                Text("Zuletzt aufgeräumt \(Fmt.relative(last.date)): \(Fmt.bytes(last.estimated))")
+                Text(L("Zuletzt aufgeräumt %@: %@", Fmt.relative(last.date), Fmt.bytes(last.estimated)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -49,19 +50,20 @@ struct MenuBarPanel: View {
                     openWindow(id: "main")
                     NSApp.activate(ignoringOtherApps: true)
                 } label: {
-                    Label("Öffnen", systemImage: "macwindow")
+                    Label(L("Öffnen"), systemImage: "macwindow")
                 }
                 .buttonStyle(.borderedProminent)
                 Spacer()
                 Button {
                     NSApp.terminate(nil)
                 } label: {
-                    Label("Beenden", systemImage: "power")
+                    Label(L("Beenden"), systemImage: "power")
                 }
             }
         }
         .padding(14)
-        .frame(width: 290)
+        .frame(width: 300)
+        .id(language)
         .onAppear { disk.refresh() }
     }
 }

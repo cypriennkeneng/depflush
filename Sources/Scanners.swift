@@ -1,31 +1,45 @@
 import Foundation
 import AppKit
 
+// MARK: - Projektordner
+
+enum ProjectRoots {
+    static let candidates = ["~/Sites", "~/Projects", "~/projects", "~/Developer", "~/dev", "~/Dev", "~/code", "~/Code",
+                             "~/workspace", "~/Workspace", "~/git", "~/src", "~/repos", "~/Documents/GitHub", "~/PhpstormProjects",
+                             "~/WebstormProjects", "~/IdeaProjects", "~/Herd", "~/Valet"]
+
+    static func detect() -> [String] {
+        candidates.filter { var d: ObjCBool = false; return FileManager.default.fileExists(atPath: Paths.expand($0), isDirectory: &d) && d.boolValue }
+    }
+}
+
 // MARK: - Übersicht
 
 enum OverviewScanner {
-    static func scan(projectRoot: String) async -> [UsageRow] {
-        let defs: [(String, String, String?, Pane?)] = [
-            ("Docker Desktop", "~/Library/Containers/com.docker.docker", "Images, Container und Volumes", .docker),
-            ("Projekte", projectRoot, "vendor/node_modules und SQL-Dumps", .dev),
-            ("Thunderbird-Mails", "~/Library/Thunderbird", "Offline-Kopie der Postfächer – in Thunderbird unter Konto → Synchronisation & Speicherplatz begrenzen", nil),
-            ("Apple Mail", "~/Library/Mail", nil, nil),
-            ("App-Caches", "~/Library/Caches", "Zwischenspeicher der Apps", .caches),
-            ("WhatsApp-Medien", "~/Library/Group Containers/group.net.whatsapp.WhatsApp.shared", "In WhatsApp: Einstellungen → Speicher → große Dateien löschen", nil),
-            ("Claude", "~/Library/Application Support/Claude", "Wird von Claude/Cowork gebraucht", nil),
-            ("Chrome-Profil", "~/Library/Application Support/Google", nil, nil),
-            ("Adobe", "~/Library/Application Support/Adobe", nil, nil),
-            ("Slack", "~/Library/Application Support/Slack", nil, nil),
-            ("Discord", "~/Library/Application Support/discord", nil, nil),
-            ("Filme", "~/Movies", nil, nil),
-            ("Downloads", "~/Downloads", "Selbst durchsehen – enthält persönliche Unterlagen", nil),
-            ("Dokumente", "~/Documents", nil, nil),
-            ("Schreibtisch", "~/Desktop", nil, nil),
-            ("Bilder", "~/Pictures", nil, nil),
-            ("iPhone-Backups", "~/Library/Application Support/MobileSync/Backup", "Finder → iPhone → Backups verwalten", nil),
-            ("Xcode / Developer", "~/Library/Developer", nil, nil),
-            ("npm-, pnpm- & Tool-Caches", "~/.npm", nil, .caches),
+    static func scan(projectRoots: [String]) async -> [UsageRow] {
+        var defs: [(String, String, String?, Pane?)] = [
+            (L("Docker Desktop"), "~/Library/Containers/com.docker.docker", L("Images, Container und Volumes"), .docker),
+            (L("Thunderbird-Mails"), "~/Library/Thunderbird", L("Offline-Kopie der Postfächer – in Thunderbird unter Konto → Synchronisation & Speicherplatz begrenzen"), nil),
+            (L("Apple Mail"), "~/Library/Mail", nil, nil),
+            (L("App-Caches"), "~/Library/Caches", L("Zwischenspeicher der Apps"), .caches),
+            (L("WhatsApp-Medien"), "~/Library/Group Containers/group.net.whatsapp.WhatsApp.shared", L("In WhatsApp: Einstellungen → Speicher → große Dateien löschen"), nil),
+            (L("Claude"), "~/Library/Application Support/Claude", nil, nil),
+            (L("Chrome-Profil"), "~/Library/Application Support/Google", nil, nil),
+            (L("Adobe"), "~/Library/Application Support/Adobe", nil, nil),
+            (L("Slack"), "~/Library/Application Support/Slack", nil, nil),
+            (L("Discord"), "~/Library/Application Support/discord", nil, nil),
+            (L("Filme"), "~/Movies", nil, nil),
+            (L("Downloads"), "~/Downloads", L("Selbst durchsehen – enthält oft persönliche Unterlagen"), nil),
+            (L("Dokumente"), "~/Documents", nil, nil),
+            (L("Schreibtisch"), "~/Desktop", nil, nil),
+            (L("Bilder"), "~/Pictures", nil, nil),
+            (L("iPhone-Backups"), "~/Library/Application Support/MobileSync/Backup", L("Finder → iPhone → Backups verwalten"), nil),
+            (L("Xcode / Developer"), "~/Library/Developer", nil, nil),
+            (L("npm-Cache"), "~/.npm", nil, .caches),
         ]
+        for r in projectRoots {
+            defs.append((L("Projekte (%@)", URL(fileURLWithPath: Paths.expand(r)).lastPathComponent), r, L("vendor/node_modules und SQL-Dumps"), .dev))
+        }
         var rows: [UsageRow] = []
         await withTaskGroup(of: UsageRow?.self) { g in
             for (title, path, hint, pane) in defs {
@@ -43,7 +57,6 @@ enum OverviewScanner {
 
     static func swap() async -> Int64? {
         let r = await Shell.run("/usr/sbin/sysctl", ["-n", "vm.swapusage"])
-        // "total = 20480.00M  used = 19171.56M  free = ..."
         guard let range = r.out.range(of: #"total = ([0-9.]+)M"#, options: .regularExpression) else { return nil }
         let num = r.out[range].replacingOccurrences(of: "total = ", with: "").replacingOccurrences(of: "M", with: "")
         guard let mb = Double(num) else { return nil }
@@ -63,54 +76,70 @@ struct CacheRule {
 }
 
 enum CacheScanner {
-    static let rules: [CacheRule] = [
-        CacheRule(title: "Google Chrome – Cache", detail: "Browser-Cache, baut sich automatisch neu auf", patterns: ["~/Library/Caches/Google"], bundleIDs: ["com.google.Chrome"], appName: "Google Chrome"),
-        CacheRule(title: "Firefox – Cache", detail: "Browser-Cache, baut sich automatisch neu auf", patterns: ["~/Library/Caches/Firefox", "~/Library/Caches/Mozilla"], bundleIDs: ["org.mozilla.firefox"], appName: "Firefox"),
-        CacheRule(title: "ChatGPT Atlas – Cache", detail: "Browser-Cache", patterns: ["~/Library/Caches/com.openai.atlas"], bundleIDs: ["com.openai.atlas"], appName: "ChatGPT Atlas"),
-        CacheRule(title: "ChatGPT – Cache", detail: "App-Cache", patterns: ["~/Library/Caches/com.openai.chat"], bundleIDs: ["com.openai.chat"], appName: "ChatGPT"),
-        CacheRule(title: "Thunderbird – Cache", detail: "Nur der Cache, keine Mails", patterns: ["~/Library/Caches/Thunderbird"], bundleIDs: ["org.mozilla.thunderbird"], appName: "Thunderbird"),
-        CacheRule(title: "WhatsApp – Cache", detail: "Nur der Cache, keine Chats", patterns: ["~/Library/Caches/net.whatsapp.WhatsApp"], bundleIDs: ["net.whatsapp.WhatsApp", "desktop.WhatsApp"], appName: "WhatsApp"),
-        CacheRule(title: "CapCut – Cache", detail: "Vorschau-Cache, deine Projekte bleiben", patterns: ["~/Movies/CapCut/User Data/Cache"], bundleIDs: ["com.lemon.lvoverseas"], appName: "CapCut"),
-        CacheRule(title: "Claude – Cache", detail: "Web-Cache der Claude-App (kein Verlauf)", patterns: ["~/Library/Application Support/Claude/Cache", "~/Library/Application Support/Claude/Code Cache"], bundleIDs: ["com.anthropic.claudefordesktop"], appName: "Claude"),
-        CacheRule(title: "Slack – Cache", detail: "Web-Cache der Slack-App", patterns: ["~/Library/Application Support/Slack/Cache", "~/Library/Application Support/Slack/Code Cache", "~/Library/Application Support/Slack/Service Worker/CacheStorage"], bundleIDs: ["com.tinyspeck.slackmacgap"], appName: "Slack"),
-        CacheRule(title: "Discord – Cache", detail: "Web-Cache der Discord-App", patterns: ["~/Library/Application Support/discord/Cache", "~/Library/Application Support/discord/Code Cache"], bundleIDs: ["com.hnc.Discord"], appName: "Discord"),
-        CacheRule(title: "npm – Cache", detail: "Entspricht „npm cache clean --force“", patterns: ["~/.npm/_cacache"]),
-        CacheRule(title: "Composer – Cache", detail: "Paket-Downloads, werden bei Bedarf neu geladen", patterns: ["~/Library/Caches/composer", "~/.composer/cache"]),
-        CacheRule(title: "Yarn – Cache", detail: "Paket-Downloads", patterns: ["~/Library/Caches/Yarn"]),
-        CacheRule(title: "pip – Cache", detail: "Python-Paket-Downloads", patterns: ["~/Library/Caches/pip"]),
-        CacheRule(title: "Puppeteer – Browser", detail: "Heruntergeladene Test-Browser, werden bei Bedarf neu geladen", patterns: ["~/.cache/puppeteer"]),
-        CacheRule(title: "Playwright – Browser", detail: "Heruntergeladene Test-Browser, werden bei Bedarf neu geladen", patterns: ["~/Library/Caches/ms-playwright"]),
-        CacheRule(title: "shopware-cli – Cache", detail: "Tool-Cache", patterns: ["~/Library/Caches/shopware-cli"]),
-        CacheRule(title: "Java-/PhpStorm-Crash-Dumps", detail: "Speicherabbilder nach Abstürzen (*.hprof, java_error_*.log)", patterns: ["~/*.hprof", "~/java_error_in_*.log", "~/jbr_err_*.log"]),
-        CacheRule(title: "Absturzberichte", detail: "~/Library/Logs/DiagnosticReports", patterns: ["~/Library/Logs/DiagnosticReports/*"]),
-    ]
+    static var rules: [CacheRule] {
+        let browser = L("Browser-Cache, baut sich automatisch neu auf")
+        let web = L("Web-Cache der App (keine Chats, keine Anmeldung)")
+        let pkg = L("Paket-Downloads, werden bei Bedarf neu geladen")
+        let browsers = L("Heruntergeladene Test-Browser, werden bei Bedarf neu geladen")
+        return [
+            CacheRule(title: L("Google Chrome – Cache"), detail: browser, patterns: ["~/Library/Caches/Google"], bundleIDs: ["com.google.Chrome"], appName: "Google Chrome"),
+            CacheRule(title: L("Firefox – Cache"), detail: browser, patterns: ["~/Library/Caches/Firefox", "~/Library/Caches/Mozilla"], bundleIDs: ["org.mozilla.firefox"], appName: "Firefox"),
+            CacheRule(title: L("Brave – Cache"), detail: browser, patterns: ["~/Library/Caches/BraveSoftware"], bundleIDs: ["com.brave.Browser"], appName: "Brave"),
+            CacheRule(title: L("Microsoft Edge – Cache"), detail: browser, patterns: ["~/Library/Caches/Microsoft Edge"], bundleIDs: ["com.microsoft.edgemac"], appName: "Microsoft Edge"),
+            CacheRule(title: L("Arc – Cache"), detail: browser, patterns: ["~/Library/Caches/Arc"], bundleIDs: ["company.thebrowser.Browser"], appName: "Arc"),
+            CacheRule(title: L("ChatGPT Atlas – Cache"), detail: browser, patterns: ["~/Library/Caches/com.openai.atlas"], bundleIDs: ["com.openai.atlas"], appName: "ChatGPT Atlas"),
+            CacheRule(title: L("ChatGPT – Cache"), detail: web, patterns: ["~/Library/Caches/com.openai.chat"], bundleIDs: ["com.openai.chat"], appName: "ChatGPT"),
+            CacheRule(title: L("Thunderbird – Cache"), detail: L("Nur der Cache, keine Mails"), patterns: ["~/Library/Caches/Thunderbird"], bundleIDs: ["org.mozilla.thunderbird"], appName: "Thunderbird"),
+            CacheRule(title: L("WhatsApp – Cache"), detail: web, patterns: ["~/Library/Caches/net.whatsapp.WhatsApp"], bundleIDs: ["net.whatsapp.WhatsApp", "desktop.WhatsApp"], appName: "WhatsApp"),
+            CacheRule(title: L("CapCut – Cache"), detail: L("Vorschau-Cache, deine Projekte bleiben"), patterns: ["~/Movies/CapCut/User Data/Cache"], bundleIDs: ["com.lemon.lvoverseas"], appName: "CapCut"),
+            CacheRule(title: L("Claude – Cache"), detail: web, patterns: ["~/Library/Application Support/Claude/Cache", "~/Library/Application Support/Claude/Code Cache"], bundleIDs: ["com.anthropic.claudefordesktop"], appName: "Claude"),
+            CacheRule(title: L("Slack – Cache"), detail: web, patterns: ["~/Library/Application Support/Slack/Cache", "~/Library/Application Support/Slack/Code Cache", "~/Library/Application Support/Slack/Service Worker/CacheStorage"], bundleIDs: ["com.tinyspeck.slackmacgap"], appName: "Slack"),
+            CacheRule(title: L("Discord – Cache"), detail: web, patterns: ["~/Library/Application Support/discord/Cache", "~/Library/Application Support/discord/Code Cache"], bundleIDs: ["com.hnc.Discord"], appName: "Discord"),
+            CacheRule(title: L("VS Code – Cache"), detail: web, patterns: ["~/Library/Application Support/Code/Cache", "~/Library/Application Support/Code/CachedData", "~/Library/Application Support/Code/CachedExtensionVSIXs"], bundleIDs: ["com.microsoft.VSCode"], appName: "VS Code"),
+            CacheRule(title: L("Cursor – Cache"), detail: web, patterns: ["~/Library/Application Support/Cursor/Cache", "~/Library/Application Support/Cursor/CachedData"], bundleIDs: ["com.todesktop.230313mzl4w4u92"], appName: "Cursor"),
+            CacheRule(title: L("npm – Cache"), detail: L("Entspricht „npm cache clean --force“"), patterns: ["~/.npm/_cacache"]),
+            CacheRule(title: L("Composer – Cache"), detail: pkg, patterns: ["~/Library/Caches/composer", "~/.composer/cache", "~/.cache/composer"]),
+            CacheRule(title: L("Yarn – Cache"), detail: pkg, patterns: ["~/Library/Caches/Yarn"]),
+            CacheRule(title: L("pnpm – Store"), detail: pkg, patterns: ["~/Library/pnpm/store"]),
+            CacheRule(title: L("pip – Cache"), detail: pkg, patterns: ["~/Library/Caches/pip"]),
+            CacheRule(title: L("Go – Build-Cache"), detail: pkg, patterns: ["~/Library/Caches/go-build"]),
+            CacheRule(title: L("Gradle – Cache"), detail: pkg, patterns: ["~/.gradle/caches"]),
+            CacheRule(title: L("CocoaPods – Cache"), detail: pkg, patterns: ["~/Library/Caches/CocoaPods"]),
+            CacheRule(title: L("Xcode – DerivedData"), detail: L("Build-Zwischenstände, werden beim nächsten Build neu erzeugt"), patterns: ["~/Library/Developer/Xcode/DerivedData"], bundleIDs: ["com.apple.dt.Xcode"], appName: "Xcode"),
+            CacheRule(title: L("Puppeteer – Browser"), detail: browsers, patterns: ["~/.cache/puppeteer"]),
+            CacheRule(title: L("Playwright – Browser"), detail: browsers, patterns: ["~/Library/Caches/ms-playwright"]),
+            CacheRule(title: L("shopware-cli – Cache"), detail: L("Tool-Cache"), patterns: ["~/Library/Caches/shopware-cli"]),
+            CacheRule(title: L("Java-/JetBrains-Crash-Dumps"), detail: L("Speicherabbilder nach Abstürzen (*.hprof, java_error_*.log)"), patterns: ["~/*.hprof", "~/java_error_in_*.log", "~/jbr_err_*.log"]),
+            CacheRule(title: L("Absturzberichte"), detail: "~/Library/Logs/DiagnosticReports", patterns: ["~/Library/Logs/DiagnosticReports/*"]),
+        ]
+    }
 
     static func scan() async -> [CleanItem] {
         let running = await MainActor.run { Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier }) }
         var items: [CleanItem] = []
+        let group = L("App- & Entwickler-Caches")
 
         for r in rules {
             let urls = r.patterns.flatMap { Paths.glob($0) }
             guard !urls.isEmpty else { continue }
             let blocked = r.bundleIDs.contains(where: { running.contains($0) }) ? (r.appName ?? "App") : nil
-            items.append(CleanItem(id: r.title, title: r.title, detail: r.detail, size: nil,
+            items.append(CleanItem(id: r.patterns.joined(), title: r.title, detail: r.detail, size: nil,
                                    selected: r.on && blocked == nil, action: .delete(urls),
-                                   revealPath: urls.first?.path, blockedBy: blocked, group: "App- & Entwickler-Caches"))
+                                   revealPath: urls.first?.path, blockedBy: blocked, group: group))
         }
 
         if let brew = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"].first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
-            items.append(CleanItem(id: "brew", title: "Homebrew – alte Versionen & Downloads",
-                                   detail: "Führt „brew cleanup --prune=all“ aus", size: nil, selected: true,
+            items.append(CleanItem(id: "brew", title: L("Homebrew – alte Versionen & Downloads"),
+                                   detail: L("Führt „brew cleanup --prune=all“ aus"), size: nil, selected: true,
                                    action: .command(brew, ["cleanup", "--prune=all"]),
-                                   revealPath: Paths.expand("~/Library/Caches/Homebrew"), group: "App- & Entwickler-Caches"))
+                                   revealPath: Paths.expand("~/Library/Caches/Homebrew"), group: group))
         }
 
         items += jetbrains()
 
-        items.append(CleanItem(id: "trash", title: "Papierkorb leeren", detail: "Leert den Papierkorb über den Finder",
-                               size: nil, selected: false, action: .emptyTrash, group: "Papierkorb"))
+        items.append(CleanItem(id: "trash", title: L("Papierkorb leeren"), detail: L("Leert den Papierkorb über den Finder"),
+                               size: nil, selected: false, action: .emptyTrash, group: L("Papierkorb")))
 
-        // Größen parallel ermitteln
         let jobs: [(Int, [URL])] = items.enumerated().map { (i, it) in
             switch it.action {
             case .delete(let u): return (i, u)
@@ -135,9 +164,9 @@ enum CacheScanner {
     /// Caches/Logs alter JetBrains-IDE-Versionen (die neueste je Produkt bleibt)
     static func jetbrains() -> [CleanItem] {
         let bases: [(String, String, Bool)] = [
-            ("~/Library/Caches/JetBrains", "Cache", true),
-            ("~/Library/Logs/JetBrains", "Logs", true),
-            ("~/Library/Application Support/JetBrains", "Einstellungen & Plugins", false),
+            ("~/Library/Caches/JetBrains", L("Cache"), true),
+            ("~/Library/Logs/JetBrains", L("Logs"), true),
+            ("~/Library/Application Support/JetBrains", L("Einstellungen & Plugins"), false),
         ]
         let rx = try! NSRegularExpression(pattern: #"^([A-Za-z]+)(\d{4})\.(\d+)$"#)
         func parse(_ name: String) -> (String, Int)? {
@@ -159,10 +188,10 @@ enum CacheScanner {
             for u in Paths.glob(b + "/*") {
                 guard let r = parse(u.lastPathComponent), let top = newest[r.0], r.1 < top else { continue }
                 res.append(CleanItem(id: u.path, title: "\(u.lastPathComponent) – \(label)",
-                                     detail: "Alte IDE-Version, aktuell ist \(r.0) \(top / 100).\(top % 100)",
+                                     detail: L("Alte IDE-Version, aktuell ist %@", "\(r.0) \(top / 100).\(top % 100)"),
                                      size: nil, selected: on, action: .delete([u]), revealPath: u.path,
-                                     warning: on ? nil : "Nur löschen, wenn du diese Version nicht mehr brauchst",
-                                     group: "Alte JetBrains-Versionen"))
+                                     warning: on ? nil : L("Nur löschen, wenn du diese Version nicht mehr brauchst"),
+                                     group: L("Alte JetBrains-Versionen")))
             }
         }
         return res
@@ -172,7 +201,9 @@ enum CacheScanner {
 // MARK: - Entwicklung
 
 enum DevScanner {
-    static func scanDeps(root: URL, inactiveMonths: Int) async -> [CleanItem] {
+    static func label(for root: URL, multi: Bool) -> String { multi ? root.lastPathComponent + "/" : "" }
+
+    static func scanDeps(root: URL, multi: Bool, inactiveMonths: Int) async -> [CleanItem] {
         let args = [root.path, "-maxdepth", "6",
                     "(", "-name", ".git", "-o", "-name", ".ddev", "-o", "-name", "var", ")", "-prune", "-o",
                     "-type", "d", "(", "-name", "node_modules", "-o", "-name", "vendor", ")", "-prune", "-print"]
@@ -190,6 +221,10 @@ enum DevScanner {
         }
         let cutoff = Calendar.current.date(byAdding: .month, value: -inactiveMonths, to: Date()) ?? Date()
         let rootPath = root.path + "/"
+        let prefix = label(for: root, multi: multi)
+        let gInactive = L("Abhängigkeiten ruhender Projekte (> %d Monate)", inactiveMonths)
+        let gActive = L("Abhängigkeiten aktiver Projekte")
+        let pluginWarn = L("Gehört zu einem Plugin/Paket – wird eventuell zur Laufzeit gebraucht")
         var items: [CleanItem] = []
         await withTaskGroup(of: CleanItem.self) { g in
             for (u, restore) in cands {
@@ -199,22 +234,17 @@ enum DevScanner {
                     let last = lastActivity(project)
                     let inactive = (last ?? .distantPast) < cutoff
                     let rel = project.path.replacingOccurrences(of: rootPath, with: "")
-                    let nested = ["/custom/plugins/", "/custom/apps/", "/custom/static-plugins/"].contains { rel.contains($0) }
-                    return CleanItem(id: u.path, title: rel,
-                                     detail: "\(u.lastPathComponent) · Projekt zuletzt geändert: \(Fmt.date(last)) · wiederherstellbar mit „\(restore)“",
+                    let nested = ["/custom/plugins/", "/custom/apps/", "/custom/static-plugins/", "/packages/", "/plugins/"].contains { rel.contains($0) }
+                    return CleanItem(id: u.path, title: prefix + rel,
+                                     detail: L("%@ · Projekt zuletzt geändert: %@ · wiederherstellbar mit „%@“", u.lastPathComponent, Fmt.date(last), restore),
                                      size: size, selected: inactive && !nested, action: .delete([u]), revealPath: u.path,
-                                     warning: nested ? "Gehört zu einem Shopware-Plugin/App – wird eventuell zur Laufzeit gebraucht" : nil,
-                                     group: inactive ? "Abhängigkeiten ruhender Projekte (> \(inactiveMonths) Monate)" : "Abhängigkeiten aktiver Projekte")
+                                     warning: nested ? pluginWarn : nil,
+                                     group: inactive ? gInactive : gActive)
                 }
             }
             for await it in g { items.append(it) }
         }
-        return items
-            .filter { ($0.size ?? 0) > 20_000_000 }
-            .sorted { a, b in
-                if a.selected != b.selected { return a.selected }
-                return (a.size ?? 0) > (b.size ?? 0)
-            }
+        return items.filter { ($0.size ?? 0) > 20_000_000 }
     }
 
     /// Neueste Änderung im Projekt – ohne Abhängigkeiten, Caches und Git
@@ -240,28 +270,32 @@ enum DevScanner {
         return newest
     }
 
-    static func scanDumps(root: URL, progress: @escaping @Sendable (String) -> Void) async -> [CleanItem] {
-        let args = [root.path, "(", "-name", "node_modules", "-o", "-name", "vendor", "-o", "-name", ".git", ")", "-prune", "-o",
-                    "-type", "f", "(", "-iname", "*.sql", "-o", "-iname", "*.sql.gz", "-o", "-iname", "*.sql.zip", "-o", "-iname", "*.dump", ")",
-                    "-size", "+100M", "-print"]
-        let r = await Shell.run("/usr/bin/find", args, timeout: 600)
-        struct F { let url: URL; let size: Int64; let date: Date? }
+    static func scanDumps(roots: [URL], progress: @escaping @Sendable (String) -> Void) async -> [CleanItem] {
+        struct F { let url: URL; let size: Int64; let date: Date?; let rel: String }
         var files: [F] = []
-        for line in r.out.split(separator: "\n") {
-            let u = URL(fileURLWithPath: String(line))
-            let v = try? u.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-            files.append(F(url: u, size: Int64(v?.fileSize ?? 0), date: v?.contentModificationDate))
+        let multi = roots.count > 1
+        for root in roots {
+            let args = [root.path, "(", "-name", "node_modules", "-o", "-name", "vendor", "-o", "-name", ".git", ")", "-prune", "-o",
+                        "-type", "f", "(", "-iname", "*.sql", "-o", "-iname", "*.sql.gz", "-o", "-iname", "*.sql.zip", "-o", "-iname", "*.dump", ")",
+                        "-size", "+100M", "-print"]
+            let r = await Shell.run("/usr/bin/find", args, timeout: 600)
+            let rootPath = root.path + "/"
+            let prefix = label(for: root, multi: multi)
+            for line in r.out.split(separator: "\n") {
+                let u = URL(fileURLWithPath: String(line))
+                let v = try? u.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                files.append(F(url: u, size: Int64(v?.fileSize ?? 0), date: v?.contentModificationDate,
+                               rel: prefix + u.path.replacingOccurrences(of: rootPath, with: "")))
+            }
         }
-        let rootPath = root.path + "/"
-        func rel(_ u: URL) -> String { u.path.replacingOccurrences(of: rootPath, with: "") }
 
         var items: [CleanItem] = []
         var dupPaths = Set<String>()
-        let bySize = Dictionary(grouping: files, by: { $0.size })
-        for (_, group) in bySize where group.count > 1 {
+        let gDup = L("Doppelte SQL-Dumps")
+        for (_, group) in Dictionary(grouping: files, by: { $0.size }) where group.count > 1 {
             var byHash: [String: [F]] = [:]
             for f in group {
-                progress("Vergleiche \(f.url.lastPathComponent) (\(Fmt.bytes(f.size)))…")
+                progress(L("Vergleiche %@ (%@) …", f.url.lastPathComponent, Fmt.bytes(f.size)))
                 if let h = await Sizer.sha256Async(f.url) { byHash[h, default: []].append(f) }
             }
             for (_, same) in byHash where same.count > 1 {
@@ -269,18 +303,19 @@ enum DevScanner {
                 let keep = sorted[0]
                 for d in sorted.dropFirst() {
                     dupPaths.insert(d.url.path)
-                    items.append(CleanItem(id: d.url.path, title: rel(d.url),
-                                           detail: "Identisch mit \(rel(keep.url)) (SHA-256 geprüft) – das Original bleibt",
+                    items.append(CleanItem(id: d.url.path, title: d.rel,
+                                           detail: L("Identisch mit %@ (SHA-256 geprüft) – das Original bleibt", keep.rel),
                                            size: d.size, selected: true, action: .delete([d.url]), revealPath: d.url.path,
-                                           group: "Doppelte SQL-Dumps"))
+                                           group: gDup))
                 }
             }
         }
+        let gBig = L("Große SQL-Dumps (> 1 GB) – selbst entscheiden")
         for f in files.sorted(by: { $0.size > $1.size }) where !dupPaths.contains(f.url.path) && f.size > 1_000_000_000 {
-            items.append(CleanItem(id: f.url.path, title: rel(f.url), detail: "Dump vom \(Fmt.date(f.date))",
+            items.append(CleanItem(id: f.url.path, title: f.rel, detail: L("Dump vom %@", Fmt.date(f.date)),
                                    size: f.size, selected: false, action: .delete([f.url]), revealPath: f.url.path,
-                                   warning: "Kein Duplikat – nur löschen, wenn du den Stand nicht mehr brauchst",
-                                   group: "Große SQL-Dumps (> 1 GB) – selbst entscheiden"))
+                                   warning: L("Kein Duplikat – nur löschen, wenn du den Stand nicht mehr brauchst"),
+                                   group: gBig))
         }
         return items
     }
@@ -290,14 +325,14 @@ enum DevScanner {
 
 enum Docker {
     static var binary: String? {
-        ["/usr/local/bin/docker", "/opt/homebrew/bin/docker", "/Applications/Docker.app/Contents/Resources/bin/docker"]
+        ["/usr/local/bin/docker", "/opt/homebrew/bin/docker", "/Applications/Docker.app/Contents/Resources/bin/docker", Paths.expand("~/.docker/bin/docker"), Paths.expand("~/.orbstack/bin/docker")]
             .first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
     static let rawPath = "~/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
 
     static func run(_ args: [String], timeout: TimeInterval = 120) async -> ShellResult {
-        guard let b = binary else { return ShellResult(status: -1, out: "", err: "Docker ist nicht installiert") }
+        guard let b = binary else { return ShellResult(status: -1, out: "", err: L("Docker ist nicht installiert")) }
         return await Shell.run(b, args, timeout: timeout)
     }
 
@@ -322,20 +357,18 @@ enum Docker {
         var summary: [String] = []
         var items: [CleanItem] = []
 
-        // Überblick + Build-Cache
         let df = jsonLines(await run(["system", "df", "--format", "{{json .}}"]).out)
-        let names = ["Images": "Images", "Containers": "Container", "Local Volumes": "Volumes", "Build Cache": "Build-Cache"]
+        let names = ["Images": L("Images"), "Containers": L("Container"), "Local Volumes": L("Volumes"), "Build Cache": L("Build-Cache")]
         for row in df {
             let t = row["Type"] as? String ?? ""
-            summary.append("\(names[t] ?? t): \(row["Size"] as? String ?? "–") · freigebbar \(row["Reclaimable"] as? String ?? "–")")
+            summary.append(L("%@: %@ · freigebbar %@", names[t] ?? t, row["Size"] as? String ?? "–", row["Reclaimable"] as? String ?? "–"))
             if t == "Build Cache", let s = row["Size"] as? String, parseSize(s) > 0 {
-                items.append(CleanItem(id: "buildcache", title: "Build-Cache", detail: "docker builder prune -a",
+                items.append(CleanItem(id: "buildcache", title: L("Build-Cache"), detail: "docker builder prune -a",
                                        size: parseSize(s), selected: true, action: .docker(["builder", "prune", "-a", "-f"]),
-                                       group: "Build-Cache"))
+                                       group: L("Build-Cache")))
             }
         }
 
-        // Container
         let containers = jsonLines(await run(["ps", "-a", "-s", "--no-trunc", "--format", "{{json .}}"], timeout: 300).out)
         var usedImageIDs = Set<String>()
         let ids = containers.compactMap { $0["ID"] as? String }
@@ -343,20 +376,20 @@ enum Docker {
             let r = await run(["inspect", "--format", "{{.Image}}"] + ids)
             for l in r.out.split(separator: "\n") { usedImageIDs.insert(String(l)) }
         }
+        let gCont = L("Gestoppte Container")
+        let contWarn = L("Code und Daten im Container gehen verloren (z. B. liegt bei Dockware der Shop im Container)")
         for c in containers where (c["State"] as? String) != "running" {
             let id = c["ID"] as? String ?? ""
             let name = c["Names"] as? String ?? String(id.prefix(12))
             let img = c["Image"] as? String ?? ""
             items.append(CleanItem(id: "c-" + id, title: name, detail: "\(img) · \(c["Status"] as? String ?? "")",
                                    size: parseSize(c["Size"] as? String ?? "0B"), selected: false,
-                                   action: .docker(["rm", id]),
-                                   warning: "Code und Daten im Container gehen verloren (bei Dockware liegt der Shop im Container)",
-                                   group: "Gestoppte Container"))
+                                   action: .docker(["rm", id]), warning: contWarn, group: gCont))
         }
 
-        // Ungenutzte Images
         let imgs = jsonLines(await run(["images", "--digests", "--no-trunc", "--format", "{{json .}}"]).out)
         var seenRefs = Set<String>()
+        let gImg = L("Ungenutzte Images")
         for i in imgs {
             let id = i["ID"] as? String ?? ""
             guard !usedImageIDs.contains(id) else { continue }
@@ -366,19 +399,18 @@ enum Docker {
             let dangling = repo == "<none>"
             let pulled = digest != "<none>" && !digest.isEmpty
             let shortID = String(id.replacingOccurrences(of: "sha256:", with: "").prefix(12))
-            let name = dangling ? "<ohne Namen> \(shortID)" : "\(repo):\(tag)"
+            let name = dangling ? L("<ohne Namen> %@", shortID) : "\(repo):\(tag)"
             let ref = (dangling || tag == "<none>") ? id : "\(repo):\(tag)"
             guard !seenRefs.contains(ref) else { continue }
             seenRefs.insert(ref)
-            let how = pulled ? "kann per docker pull neu geladen werden" : (dangling ? "verwaistes Zwischen-Image" : "lokal gebaut")
+            let how = pulled ? L("kann per docker pull neu geladen werden") : (dangling ? L("verwaistes Zwischen-Image") : L("lokal gebaut"))
             items.append(CleanItem(id: "i-" + ref, title: name, detail: "\(i["CreatedSince"] as? String ?? "") · \(how)",
                                    size: parseSize(i["Size"] as? String ?? "0B"), selected: pulled || dangling,
                                    action: .docker(["rmi", ref]),
-                                   warning: (pulled || dangling) ? nil : "Lokal gebaut – nur per Neubau wiederherstellbar",
-                                   group: "Ungenutzte Images"))
+                                   warning: (pulled || dangling) ? nil : L("Lokal gebaut – nur per Neubau wiederherstellbar"),
+                                   group: gImg))
         }
 
-        // Verwaiste Volumes
         let dangling = await run(["volume", "ls", "-f", "dangling=true", "--format", "{{.Name}}"]).out
             .split(separator: "\n").map(String.init).filter { !$0.isEmpty }
         if !dangling.isEmpty {
@@ -392,11 +424,12 @@ enum Docker {
                 let parts = line.split(separator: " ", omittingEmptySubsequences: true)
                 if parts.count >= 3 { sizes[String(parts[0])] = parseSize(String(parts[parts.count - 1])) }
             }
+            let gVol = L("Verwaiste Volumes")
             for name in dangling.sorted() {
-                items.append(CleanItem(id: "v-" + name, title: name, detail: "Volume, das an keinem Container hängt",
+                items.append(CleanItem(id: "v-" + name, title: name, detail: L("Volume, das an keinem Container hängt"),
                                        size: sizes[name], selected: false, action: .docker(["volume", "rm", name]),
-                                       warning: "Enthaltene Daten (z. B. Datenbanken) gehen verloren",
-                                       group: "Verwaiste Volumes"))
+                                       warning: L("Enthaltene Daten (z. B. Datenbanken) gehen verloren"),
+                                       group: gVol))
             }
         }
         return (summary, items)

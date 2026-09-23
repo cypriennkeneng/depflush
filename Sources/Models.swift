@@ -7,12 +7,12 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .overview: return "Übersicht"
-        case .caches: return "Caches"
-        case .dev: return "Entwicklung"
-        case .docker: return "Docker"
-        case .history: return "Verlauf"
-        case .settings: return "Einstellungen"
+        case .overview: return L("Übersicht")
+        case .caches: return L("Caches")
+        case .dev: return L("Entwicklung")
+        case .docker: return L("Docker")
+        case .history: return L("Verlauf")
+        case .settings: return L("Einstellungen")
         }
     }
 
@@ -33,6 +33,8 @@ enum CleanAction {
     case command(String, [String])
     case docker([String])
     case emptyTrash
+
+    var isFileDelete: Bool { if case .delete = self { return true } else { return false } }
 }
 
 struct CleanItem: Identifiable {
@@ -51,7 +53,7 @@ struct CleanItem: Identifiable {
 }
 
 struct UsageRow: Identifiable {
-    var id: String { title }
+    var id: String { (path ?? "") + title }
     let title: String
     let path: String?
     let size: Int64?
@@ -66,6 +68,7 @@ struct HistoryEntry: Codable, Identifiable {
     let items: [String]
     let estimated: Int64
     let measured: Int64
+    var toTrash: Bool? = nil
 }
 
 enum CleanError: LocalizedError {
@@ -73,14 +76,14 @@ enum CleanError: LocalizedError {
     case failed(String)
     var errorDescription: String? {
         switch self {
-        case .blocked(let p): return "Geschützter Pfad, nicht gelöscht: \(p)"
-        case .failed(let m): return m.isEmpty ? "Unbekannter Fehler" : m
+        case .blocked(let p): return L("Geschützter Pfad, nicht gelöscht: %@", p)
+        case .failed(let m): return m.isEmpty ? L("Unbekannter Fehler") : m
         }
     }
 }
 
 enum Executor {
-    static func run(_ action: CleanAction, extraProtected: [String]) async throws {
+    static func run(_ action: CleanAction, extraProtected: [String], useTrash: Bool) async throws {
         switch action {
         case .delete(let urls):
             for u in urls {
@@ -90,9 +93,19 @@ enum Executor {
                 guard Safety.isAllowed(u, extraProtected: extraProtected) else {
                     throw CleanError.blocked(Paths.tilde(u.path))
                 }
-                let r = await Shell.run("/bin/rm", ["-rf", "--", u.path], timeout: 3600)
-                if r.status != 0 {
-                    throw CleanError.failed(r.err.trimmingCharacters(in: .whitespacesAndNewlines))
+                if useTrash {
+                    let err: String? = await withCheckedContinuation { c in
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            do { try FileManager.default.trashItem(at: u, resultingItemURL: nil); c.resume(returning: nil) }
+                            catch { c.resume(returning: error.localizedDescription) }
+                        }
+                    }
+                    if let err { throw CleanError.failed(err) }
+                } else {
+                    let r = await Shell.run("/bin/rm", ["-rf", "--", u.path], timeout: 3600)
+                    if r.status != 0 {
+                        throw CleanError.failed(r.err.trimmingCharacters(in: .whitespacesAndNewlines))
+                    }
                 }
             }
         case .command(let exe, let args):
@@ -108,7 +121,7 @@ enum Executor {
                 return err == nil
             }
             if !ok {
-                throw CleanError.failed("Papierkorb konnte nicht geleert werden – bitte in Systemeinstellungen → Datenschutz → Automation dem Aufräumer den Finder erlauben.")
+                throw CleanError.failed(L("Papierkorb konnte nicht geleert werden – bitte in Systemeinstellungen → Datenschutz → Automation den Finder erlauben."))
             }
         }
     }

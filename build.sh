@@ -18,8 +18,13 @@ fi
 
 echo "→ Kompilieren"
 rm -rf build; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-swiftc -O -swift-version 5 -target arm64-apple-macosx14.0 -parse-as-library \
-  Sources/*.swift -o "$APP/Contents/MacOS/Aufraeumer"
+# Universal Binary: Apple Silicon + Intel
+for ARCH in arm64 x86_64; do
+  swiftc -O -swift-version 5 -target $ARCH-apple-macosx14.0 -parse-as-library \
+    Sources/*.swift -o "build/Aufraeumer-$ARCH"
+done
+lipo -create build/Aufraeumer-arm64 build/Aufraeumer-x86_64 -output "$APP/Contents/MacOS/Aufraeumer"
+rm build/Aufraeumer-arm64 build/Aufraeumer-x86_64
 cp Info.plist "$APP/Contents/"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 codesign --force --deep -s - "$APP"

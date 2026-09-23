@@ -8,6 +8,8 @@ struct ContentView: View {
     @EnvironmentObject var model: CleanerModel
     @EnvironmentObject var disk: DiskMonitor
     @State private var pane: Pane? = .overview
+    @AppStorage("language") private var language = "system"
+    @AppStorage("welcomeShown") private var welcomeShown = false
 
     var body: some View {
         NavigationSplitView {
@@ -33,20 +35,39 @@ struct ContentView: View {
             case .overview: OverviewView(pane: $pane)
             case .caches:
                 CleanPaneView(pane: .caches,
-                              subtitle: "Zwischenspeicher, die sich von selbst neu aufbauen. Ist eine App geöffnet, wird ihr Cache übersprungen.")
+                              subtitle: L("Zwischenspeicher, die sich von selbst neu aufbauen. Ist eine App geöffnet, wird ihr Cache übersprungen."))
             case .dev:
-                CleanPaneView(pane: .dev,
-                              subtitle: "vendor/node_modules (mit composer.lock bzw. package.json – jederzeit wiederherstellbar) und SQL-Dumps in \(model.projectRoot).")
+                if model.projectRoots.isEmpty {
+                    ContentUnavailableView {
+                        Label(L("Kein Projektordner"), systemImage: "folder.badge.questionmark")
+                    } description: {
+                        Text(L("Füge in den Einstellungen die Ordner hinzu, in denen deine Projekte liegen."))
+                    } actions: {
+                        Button(L("Zu den Einstellungen")) { pane = .settings }
+                    }
+                } else {
+                    CleanPaneView(pane: .dev,
+                                  subtitle: L("vendor/node_modules (nur mit composer.lock bzw. package.json – jederzeit wiederherstellbar) und SQL-Dumps in: %@", model.projectRoots.joined(separator: ", ")))
+                }
             case .docker: DockerView()
             case .history: HistoryView()
             case .settings: SettingsView()
             }
         }
-        .alert("Bereinigung abgeschlossen",
+        .id(language)
+        .alert(L("Bereinigung abgeschlossen"),
                isPresented: Binding(get: { model.resultMessage != nil }, set: { if !$0 { model.resultMessage = nil } })) {
-            Button("OK") {}
+            if model.offerEmptyTrash {
+                Button(L("Papierkorb jetzt leeren"), role: .destructive) { Task { await model.emptyTrash() } }
+                Button(L("Später"), role: .cancel) {}
+            } else {
+                Button("OK") {}
+            }
         } message: {
             Text(model.resultMessage ?? "")
+        }
+        .sheet(isPresented: Binding(get: { !welcomeShown }, set: { if !$0 { welcomeShown = true } })) {
+            WelcomeView { welcomeShown = true }
         }
         .task {
             if model.lastScan.isEmpty { await model.scanAll() }
@@ -59,6 +80,36 @@ struct ContentView: View {
     }
 }
 
+struct WelcomeView: View {
+    let done: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                AppBadge(size: 48)
+                VStack(alignment: .leading) {
+                    Text(L("Willkommen bei %@", AppInfo.name)).font(.title2.weight(.semibold))
+                    Text(L("Platz schaffen auf dem Mac – sicher und nachvollziehbar.")).foregroundStyle(.secondary)
+                }
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                Label(L("Nichts wird ohne deine Bestätigung gelöscht. Du siehst vorher jede Datei mit Größe."), systemImage: "checkmark.shield")
+                Label(L("Standardmäßig landet alles im Papierkorb – umstellbar in den Einstellungen."), systemImage: "trash")
+                Label(L("Alles bleibt auf deinem Mac. Die App sendet keine Daten."), systemImage: "lock")
+                Label(L("Für vollständige Werte kannst du in den Einstellungen den Festplattenvollzugriff erteilen."), systemImage: "externaldrive.badge.checkmark")
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button(L("Los geht's")) { done() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(28)
+        .frame(width: 520)
+    }
+}
+
 struct DiskCard: View {
     @EnvironmentObject var disk: DiskMonitor
     var body: some View {
@@ -66,13 +117,13 @@ struct DiskCard: View {
             HStack(spacing: 8) {
                 AppBadge(size: 30)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Aufräumer").font(.headline)
+                    Text(AppInfo.name).font(.headline)
                     Text("Macintosh HD").font(.caption).foregroundStyle(.secondary)
                 }
             }
             ProgressView(value: disk.usedFraction)
                 .tint(disk.isLow ? .red : .accentColor)
-            Text("\(Fmt.bytes(disk.free)) frei von \(Fmt.bytes(disk.total))")
+            Text(L("%@ frei von %@", Fmt.bytes(disk.free), Fmt.bytes(disk.total)))
                 .font(.caption)
                 .foregroundStyle(disk.isLow ? .red : .secondary)
         }
@@ -98,12 +149,12 @@ struct PaneHeader: View {
                     if model.busy.contains(pane) {
                         ProgressView().controlSize(.small).frame(width: 60)
                     } else {
-                        Label("Neu scannen", systemImage: "arrow.clockwise")
+                        Label(L("Neu scannen"), systemImage: "arrow.clockwise")
                     }
                 }
                 .disabled(model.busy.contains(pane))
                 if let d = model.lastScan[pane] {
-                    Text("Gescannt \(Fmt.relative(d))").font(.caption).foregroundStyle(.secondary)
+                    Text(L("Gescannt %@", Fmt.relative(d))).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -120,24 +171,27 @@ struct OverviewView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                PaneHeader(pane: .overview, subtitle: "Wo dein Speicher steckt und was sich aufräumen lässt.")
+                PaneHeader(pane: .overview, subtitle: L("Wo dein Speicher steckt und was sich aufräumen lässt."))
 
                 HStack(spacing: 14) {
-                    StatTile(title: "Frei", value: Fmt.bytes(disk.free), icon: "checkmark.circle", tint: disk.isLow ? .red : .green)
-                    StatTile(title: "Belegt", value: Fmt.bytes(max(0, disk.total - disk.free)), icon: "internaldrive", tint: .blue)
-                    StatTile(title: "Zum Aufräumen vorgemerkt", value: Fmt.bytes(model.totalSelected), icon: "sparkles", tint: .orange)
+                    StatTile(title: L("Frei"), value: Fmt.bytes(disk.free), icon: "checkmark.circle", tint: disk.isLow ? .red : .green)
+                    StatTile(title: L("Belegt"), value: Fmt.bytes(max(0, disk.total - disk.free)), icon: "internaldrive", tint: .blue)
+                    StatTile(title: L("Zum Aufräumen vorgemerkt"), value: Fmt.bytes(model.totalSelected), icon: "sparkles", tint: .orange)
                 }
 
                 if let swap = model.swap, swap > 2_000_000_000 {
                     Callout(icon: "arrow.triangle.2.circlepath",
-                            text: "Die Auslagerungsdatei (Swap) belegt \(Fmt.bytes(swap)). Ein Neustart des Macs gibt diesen Platz frei.")
+                            text: L("Die Auslagerungsdatei (Swap) belegt %@. Ein Neustart des Macs gibt diesen Platz frei.", Fmt.bytes(swap)))
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Größte Bereiche").font(.headline)
+                    Text(L("Größte Bereiche")).font(.headline)
                     if model.overview.isEmpty {
-                        HStack { ProgressView().controlSize(.small); Text(model.busy.contains(.overview) ? "Analysiere …" : "Noch nicht gescannt").foregroundStyle(.secondary) }
-                            .padding(.vertical, 20)
+                        HStack {
+                            ProgressView().controlSize(.small)
+                            Text(model.busy.contains(.overview) ? L("Analysiere …") : L("Noch nicht gescannt")).foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 20)
                     } else {
                         let maxSize = model.overview.compactMap(\.size).max() ?? 1
                         ForEach(model.overview) { row in
@@ -201,7 +255,7 @@ struct UsageRowView: View {
                 Text(Fmt.bytes(row.size)).monospacedDigit().fontWeight(.medium)
                 if let p = row.path {
                     Button { revealInFinder(p) } label: { Image(systemName: "magnifyingglass") }
-                        .buttonStyle(.borderless).help("Im Finder zeigen")
+                        .buttonStyle(.borderless).help(L("Im Finder zeigen"))
                 }
             }
             GeometryReader { geo in
@@ -216,7 +270,7 @@ struct UsageRowView: View {
                 HStack(spacing: 8) {
                     if let h = row.hint { Text(h).font(.caption).foregroundStyle(.secondary) }
                     if let p = row.pane {
-                        Button("Zu „\(p.title)“ →") { go(p) }.buttonStyle(.link).font(.caption)
+                        Button(L("Zu „%@“ →", p.title)) { go(p) }.buttonStyle(.link).font(.caption)
                     }
                 }
             }
@@ -240,6 +294,11 @@ struct CleanPaneView: View {
         for i in items where !seen.contains(i.group) { seen.append(i.group) }
         return seen
     }
+    private var confirmTitle: String {
+        let size = Fmt.bytes(model.selectedSize(pane))
+        let files = model.items(for: pane).filter(\.isActive).contains { $0.action.isFileDelete }
+        return (model.useTrash && files) ? L("%@ in den Papierkorb legen?", size) : L("%@ endgültig löschen?", size)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -255,11 +314,11 @@ struct CleanPaneView: View {
                 if model.busy.contains(pane) || model.lastScan[pane] == nil {
                     VStack(spacing: 10) {
                         ProgressView()
-                        Text(model.status.isEmpty ? "Scanne …" : model.status).foregroundStyle(.secondary)
+                        Text(model.status.isEmpty ? L("Scanne …") : model.status).foregroundStyle(.secondary)
                     }
                 } else {
-                    ContentUnavailableView("Alles sauber", systemImage: "checkmark.seal",
-                                           description: Text("Hier gibt es gerade nichts aufzuräumen."))
+                    ContentUnavailableView(L("Alles sauber"), systemImage: "checkmark.seal",
+                                           description: Text(L("Hier gibt es gerade nichts aufzuräumen.")))
                 }
                 Spacer()
             } else {
@@ -273,8 +332,8 @@ struct CleanPaneView: View {
                             HStack {
                                 Text(g)
                                 Spacer()
-                                Button("Alle") { model.setAll(true, in: pane, group: g) }
-                                Button("Keine") { model.setAll(false, in: pane, group: g) }
+                                Button(L("Alle")) { model.setAll(true, in: pane, group: g) }
+                                Button(L("Keine")) { model.setAll(false, in: pane, group: g) }
                             }
                             .buttonStyle(.link)
                         }
@@ -288,9 +347,9 @@ struct CleanPaneView: View {
         .task(id: pane) {
             if model.lastScan[pane] == nil { await model.scan(pane) }
         }
-        .alert("\(Fmt.bytes(model.selectedSize(pane))) endgültig löschen?", isPresented: $confirm) {
-            Button("Löschen", role: .destructive) { Task { await model.clean(pane) } }
-            Button("Abbrechen", role: .cancel) {}
+        .alert(confirmTitle, isPresented: $confirm) {
+            Button(model.useTrash ? L("Entfernen") : L("Löschen"), role: .destructive) { Task { await model.clean(pane) } }
+            Button(L("Abbrechen"), role: .cancel) {}
         } message: {
             Text(model.selectedSummary(pane))
         }
@@ -312,7 +371,7 @@ struct ItemRow: View {
                 Text(item.title).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
                 Text(item.detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 if let b = item.blockedBy {
-                    Label("\(b) ist geöffnet – App beenden und neu scannen", systemImage: "lock.fill")
+                    Label(L("%@ ist geöffnet – App beenden und neu scannen", b), systemImage: "lock.fill")
                         .font(.caption).foregroundStyle(.orange)
                 }
                 if let w = item.warning {
@@ -324,7 +383,7 @@ struct ItemRow: View {
             Text(Fmt.bytes(item.size)).monospacedDigit().foregroundStyle(item.isActive ? .primary : .secondary)
             if let p = item.revealPath {
                 Button { revealInFinder(p) } label: { Image(systemName: "magnifyingglass") }
-                    .buttonStyle(.borderless).help("Im Finder zeigen")
+                    .buttonStyle(.borderless).help(L("Im Finder zeigen"))
             }
         }
         .padding(.vertical, 4)
@@ -343,14 +402,17 @@ struct FooterBar: View {
                 ProgressView().controlSize(.small)
                 Text(model.status).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             } else {
-                Text("\(model.selectedCount(pane)) ausgewählt · \(Fmt.bytes(model.selectedSize(pane)))")
+                Text(L("%d ausgewählt · %@", model.selectedCount(pane), Fmt.bytes(model.selectedSize(pane))))
                     .foregroundStyle(.secondary)
+                if model.useTrash {
+                    Label(L("Papierkorb-Modus"), systemImage: "trash").font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             Button {
                 confirm = true
             } label: {
-                Label("Bereinigen …", systemImage: "trash")
+                Label(L("Bereinigen …"), systemImage: "trash")
                     .padding(.horizontal, 6)
             }
             .buttonStyle(.borderedProminent)
@@ -374,23 +436,23 @@ struct DockerView: View {
     var body: some View {
         switch model.dockerState {
         case .notInstalled:
-            ContentUnavailableView("Docker ist nicht installiert", systemImage: "shippingbox")
+            ContentUnavailableView(L("Docker ist nicht installiert"), systemImage: "shippingbox")
         case .stopped, .starting:
             ContentUnavailableView {
-                Label(model.dockerState == .starting ? "Docker startet …" : "Docker läuft nicht", systemImage: "shippingbox")
+                Label(model.dockerState == .starting ? L("Docker startet …") : L("Docker läuft nicht"), systemImage: "shippingbox")
             } description: {
-                Text("Damit ich Images, Container und Volumes prüfen kann, muss Docker Desktop laufen.")
+                Text(L("Damit Images, Container und Volumes geprüft werden können, muss Docker laufen."))
             } actions: {
                 if model.dockerState == .starting {
                     ProgressView()
                 } else {
-                    Button("Docker starten") { model.startDocker() }.buttonStyle(.borderedProminent)
-                    Button("Erneut prüfen") { Task { await model.scan(.docker) } }
+                    Button(L("Docker starten")) { model.startDocker() }.buttonStyle(.borderedProminent)
+                    Button(L("Erneut prüfen")) { Task { await model.scan(.docker) } }
                 }
             }
         case .unknown, .running:
             CleanPaneView(pane: .docker,
-                          subtitle: "Ungenutzte Images und Build-Cache sind vorausgewählt. Container und Volumes nur, wenn du sie bewusst anhakst.",
+                          subtitle: L("Ungenutzte Images und Build-Cache sind vorausgewählt. Container und Volumes nur, wenn du sie bewusst anhakst."),
                           extra: AnyView(DockerSummary()))
         }
     }
@@ -402,7 +464,7 @@ struct DockerSummary: View {
         if !model.dockerSummary.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 if let raw = model.dockerRaw {
-                    Text("Docker-Datei auf der Platte: \(Fmt.bytes(raw))").fontWeight(.medium)
+                    Text(L("Docker-Datei auf der Platte: %@", Fmt.bytes(raw))).fontWeight(.medium)
                 }
                 ForEach(model.dockerSummary, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
             }
@@ -421,19 +483,22 @@ struct HistoryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Verlauf").font(.largeTitle.weight(.semibold))
-                Text("Insgesamt freigegeben: \(Fmt.bytes(model.history.reduce(0) { $0 + $1.estimated }))")
+                Text(L("Verlauf")).font(.largeTitle.weight(.semibold))
+                Text(L("Insgesamt aufgeräumt: %@", Fmt.bytes(model.history.reduce(0) { $0 + $1.estimated })))
                     .foregroundStyle(.secondary)
             }
             .padding(24)
             if model.history.isEmpty {
-                ContentUnavailableView("Noch nichts aufgeräumt", systemImage: "clock.arrow.circlepath")
+                ContentUnavailableView(L("Noch nichts aufgeräumt"), systemImage: "clock.arrow.circlepath")
             } else {
                 List(model.history) { e in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(e.area).fontWeight(.medium)
                             Text(Fmt.dateTime(e.date)).foregroundStyle(.secondary)
+                            if e.toTrash == true {
+                                Label(L("Papierkorb"), systemImage: "trash").font(.caption).foregroundStyle(.secondary)
+                            }
                             Spacer()
                             Text(Fmt.bytes(e.estimated)).monospacedDigit().fontWeight(.medium)
                         }
@@ -450,9 +515,10 @@ struct HistoryView: View {
 // MARK: - Einstellungen
 
 struct SettingsView: View {
-    @AppStorage("projectRoot") private var projectRoot = "~/Sites"
     @AppStorage("inactiveMonths") private var inactiveMonths = 12
     @AppStorage("warnGB") private var warnGB = 20
+    @AppStorage("useTrash") private var useTrash = true
+    @AppStorage("language") private var language = "system"
     @State private var loginItem = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
     @EnvironmentObject var model: CleanerModel
@@ -460,48 +526,74 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Entwicklung") {
-                LabeledContent("Projektordner") {
+            Section(L("Allgemein")) {
+                Picker(L("Sprache"), selection: $language) {
+                    Text(L("Systemsprache")).tag("system")
+                    Text("Deutsch").tag("de")
+                    Text("English").tag("en")
+                    Text("Français").tag("fr")
+                }
+                .onChange(of: language) { model.languageChanged() }
+                Picker(L("Beim Bereinigen"), selection: $useTrash) {
+                    Text(L("In den Papierkorb legen (umkehrbar)")).tag(true)
+                    Text(L("Endgültig löschen (Platz sofort frei)")).tag(false)
+                }
+                .onChange(of: useTrash) { model.objectWillChange.send() }
+            }
+            Section(L("Projektordner")) {
+                if model.projectRoots.isEmpty {
+                    Text(L("Noch kein Ordner – füge den Ordner hinzu, in dem deine Projekte liegen.")).foregroundStyle(.secondary)
+                }
+                ForEach(model.projectRoots, id: \.self) { r in
                     HStack {
-                        Text(projectRoot).foregroundStyle(.secondary)
-                        Button("Ändern …") { chooseRoot() }
+                        Image(systemName: "folder")
+                        Text(r)
+                        Spacer()
+                        Button { model.projectRoots.removeAll { $0 == r } } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.borderless).help(L("Entfernen"))
                     }
                 }
-                Stepper("Projekte gelten als ruhend nach \(inactiveMonths) Monaten", value: $inactiveMonths, in: 1...48)
+                HStack {
+                    Button(L("Ordner hinzufügen …")) { addRoot() }
+                    Button(L("Automatisch erkennen")) {
+                        let found = ProjectRoots.detect().filter { !model.projectRoots.contains($0) }
+                        if !found.isEmpty { model.projectRoots += found }
+                    }
+                }
+                Stepper(L("Projekte gelten als ruhend nach %d Monaten", inactiveMonths), value: $inactiveMonths, in: 1...48)
             }
-            Section("Menüleiste & Warnung") {
-                Stepper("Warnen, wenn weniger als \(warnGB) GB frei sind", value: $warnGB, in: 5...200, step: 5)
+            Section(L("Menüleiste & Warnung")) {
+                Stepper(L("Warnen, wenn weniger als %d GB frei sind", warnGB), value: $warnGB, in: 5...200, step: 5)
                     .onChange(of: warnGB) { disk.refresh() }
-                Toggle("Beim Anmelden automatisch starten", isOn: $loginItem)
+                Toggle(L("Beim Anmelden automatisch starten"), isOn: $loginItem)
                     .onChange(of: loginItem) { setLogin(loginItem) }
                 if let loginError { Text(loginError).font(.caption).foregroundStyle(.red) }
             }
-            Section("Berechtigungen") {
-                Text("Für vollständige Größenangaben (z. B. Mail, iPhone-Backups) braucht der Aufräumer den Festplattenvollzugriff. Gelöscht wird nie etwas ohne deine Bestätigung.")
+            Section(L("Berechtigungen")) {
+                Text(L("Für vollständige Größenangaben (z. B. Mail, iPhone-Backups) braucht die App den Festplattenvollzugriff. Gelöscht wird nie etwas ohne deine Bestätigung."))
                     .font(.callout).foregroundStyle(.secondary)
-                Button("Festplattenvollzugriff öffnen …") {
+                Button(L("Festplattenvollzugriff öffnen …")) {
                     if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") { NSWorkspace.shared.open(u) }
                 }
             }
-            Section("Über") {
-                LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")
-                LabeledContent("Verlauf", value: "~/Library/Application Support/Aufraeumer")
+            Section(L("Über")) {
+                LabeledContent(L("Version"), value: AppInfo.version)
+                LabeledContent(L("Verlauf"), value: "~/Library/Application Support/Aufraeumer")
+                Button(L("Willkommensbildschirm erneut zeigen")) { UserDefaults.standard.set(false, forKey: "welcomeShown") }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Einstellungen")
     }
 
-    private func chooseRoot() {
+    private func addRoot() {
         let p = NSOpenPanel()
         p.canChooseDirectories = true
         p.canChooseFiles = false
-        p.allowsMultipleSelection = false
-        p.directoryURL = URL(fileURLWithPath: Paths.expand(projectRoot))
-        if p.runModal() == .OK, let u = p.url {
-            projectRoot = Paths.tilde(u.path)
-            model.lastScan[.dev] = nil
-            model.dev = []
+        p.allowsMultipleSelection = true
+        p.directoryURL = URL(fileURLWithPath: Paths.home)
+        if p.runModal() == .OK {
+            let new = p.urls.map { Paths.tilde($0.path) }.filter { !model.projectRoots.contains($0) }
+            model.projectRoots += new
         }
     }
 
@@ -510,7 +602,7 @@ struct SettingsView: View {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             loginError = nil
         } catch {
-            loginError = "Konnte nicht geändert werden: \(error.localizedDescription)"
+            loginError = L("Konnte nicht geändert werden: %@", error.localizedDescription)
         }
         loginItem = SMAppService.mainApp.status == .enabled
     }

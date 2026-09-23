@@ -9,14 +9,15 @@ struct AufraeumerApp: App {
 
     init() {
         UserDefaults.standard.register(defaults: [
-            "projectRoot": "~/Sites",
             "inactiveMonths": 12,
+            "useTrash": true,
+            "language": "system",
             "warnGB": 20,
         ])
     }
 
     var body: some Scene {
-        Window("Aufräumer", id: "main") {
+        Window(AppInfo.name, id: "main") {
             ContentView()
                 .environmentObject(model)
                 .environmentObject(disk)

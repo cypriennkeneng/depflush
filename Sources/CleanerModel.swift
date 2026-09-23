@@ -49,8 +49,8 @@ final class DiskMonitor: ObservableObject {
 
     private func notify() {
         let c = UNMutableNotificationContent()
-        c.title = "Speicher fast voll"
-        c.body = "Nur noch \(Fmt.bytes(free)) frei. Öffne den Aufräumer, um Platz zu schaffen."
+        c.title = L("Speicher fast voll")
+        c.body = L("Nur noch %@ frei. Öffne %@, um Platz zu schaffen.", Fmt.bytes(free), AppInfo.name)
         c.sound = .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "lowdisk-\(Date().timeIntervalSince1970)", content: c, trigger: nil))
     }
@@ -77,8 +77,25 @@ final class CleanerModel: ObservableObject {
     @Published var lastScan: [Pane: Date] = [:]
     @Published var history: [HistoryEntry] = []
     @Published var resultMessage: String?
+    @Published var offerEmptyTrash = false
 
-    var projectRoot: String { UserDefaults.standard.string(forKey: "projectRoot") ?? "~/Sites" }
+    var projectRoots: [String] {
+        get {
+            if let a = UserDefaults.standard.stringArray(forKey: "projectRoots") { return a }
+            var found = ProjectRoots.detect()
+            if let old = UserDefaults.standard.string(forKey: "projectRoot"), !found.contains(old) { found.insert(old, at: 0) }
+            UserDefaults.standard.set(found, forKey: "projectRoots")
+            return found
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "projectRoots")
+            objectWillChange.send()
+            lastScan[.dev] = nil
+            lastScan[.overview] = nil
+            dev = []
+        }
+    }
+    var useTrash: Bool { UserDefaults.standard.object(forKey: "useTrash") as? Bool ?? true }
     var inactiveMonths: Int {
         let v = UserDefaults.standard.integer(forKey: "inactiveMonths")
         return v > 0 ? v : 12
@@ -131,8 +148,11 @@ final class CleanerModel: ObservableObject {
     func selectedSummary(_ pane: Pane) -> String {
         let sel = items(for: pane).filter(\.isActive)
         var lines = sel.prefix(10).map { "• \($0.title) (\(Fmt.bytes($0.size)))" }
-        if sel.count > 10 { lines.append("… und \(sel.count - 10) weitere") }
-        return lines.joined(separator: "\n") + "\n\nDas kann nicht rückgängig gemacht werden."
+        if sel.count > 10 { lines.append(L("… und %d weitere", sel.count - 10)) }
+        let tail = useTrash && sel.contains(where: { $0.action.isFileDelete })
+            ? L("Dateien kommen in den Papierkorb. Platz wird erst frei, wenn du ihn leerst.")
+            : L("Das kann nicht rückgängig gemacht werden.")
+        return lines.joined(separator: "\n") + "\n\n" + tail
     }
 
     // MARK: Scannen
@@ -149,18 +169,22 @@ final class CleanerModel: ObservableObject {
         defer { busy.remove(pane); if busy.isEmpty { status = "" } }
         switch pane {
         case .overview:
-            status = "Analysiere Speicher…"
-            overview = await OverviewScanner.scan(projectRoot: projectRoot)
+            status = L("Analysiere Speicher …")
+            overview = await OverviewScanner.scan(projectRoots: projectRoots)
             swap = await OverviewScanner.swap()
         case .caches:
-            status = "Suche Caches…"
+            status = L("Suche Caches …")
             caches = await CacheScanner.scan()
         case .dev:
-            let root = URL(fileURLWithPath: Paths.expand(projectRoot))
-            status = "Suche vendor- und node_modules-Ordner…"
-            var d = await DevScanner.scanDeps(root: root, inactiveMonths: inactiveMonths)
-            status = "Suche SQL-Dumps…"
-            d += await DevScanner.scanDumps(root: root) { s in
+            let roots = projectRoots.map { URL(fileURLWithPath: Paths.expand($0)) }
+            status = L("Suche vendor- und node_modules-Ordner …")
+            var d: [CleanItem] = []
+            for root in roots {
+                d += await DevScanner.scanDeps(root: root, multi: roots.count > 1, inactiveMonths: inactiveMonths)
+            }
+            d.sort { a, b in a.selected != b.selected ? a.selected : (a.size ?? 0) > (b.size ?? 0) }
+            status = L("Suche SQL-Dumps …")
+            d += await DevScanner.scanDumps(roots: roots) { s in
                 Task { @MainActor in CleanerModel.shared.status = s }
             }
             dev = d
@@ -175,10 +199,10 @@ final class CleanerModel: ObservableObject {
 
     private func scanDocker() async {
         guard Docker.binary != nil else { dockerState = .notInstalled; docker = []; return }
-        status = "Prüfe Docker…"
+        status = L("Prüfe Docker …")
         guard await Docker.isRunning() else { dockerState = .stopped; docker = []; return }
         dockerState = .running
-        status = "Lese Images, Container und Volumes…"
+        status = L("Lese Images, Container und Volumes …")
         let r = await Docker.scan()
         dockerSummary = r.summary
         docker = r.items
@@ -219,11 +243,14 @@ final class CleanerModel: ObservableObject {
         var errors: [String] = []
         var done: [String] = []
         var estimated: Int64 = 0
-        let protectedRoots = [Paths.expand(projectRoot)]
+        let protectedRoots = projectRoots.map { Paths.expand($0) }
+        let trash = useTrash
+        var trashed = false
         for (n, item) in selected.enumerated() {
-            status = "(\(n + 1)/\(selected.count)) Entferne \(item.title)…"
+            status = L("(%d/%d) Entferne %@ …", n + 1, selected.count, item.title)
             do {
-                try await Executor.run(item.action, extraProtected: protectedRoots)
+                try await Executor.run(item.action, extraProtected: protectedRoots, useTrash: trash)
+                if trash && item.action.isFileDelete { trashed = true }
                 done.append(item.title)
                 estimated += item.size ?? 0
             } catch {
@@ -233,19 +260,36 @@ final class CleanerModel: ObservableObject {
         try? await Task.sleep(nanoseconds: 1_500_000_000)
         let measured = max(0, DiskMonitor.current().free - before)
         if !done.isEmpty {
-            history.insert(HistoryEntry(date: Date(), area: pane.title, items: done, estimated: estimated, measured: measured), at: 0)
+            history.insert(HistoryEntry(date: Date(), area: pane.title, items: done, estimated: estimated, measured: measured, toTrash: trashed), at: 0)
             saveHistory()
         }
-        var msg = "\(done.count) von \(selected.count) Elementen entfernt.\nFreigegeben: ca. \(Fmt.bytes(estimated))"
-        if measured > 0 { msg += " (sofort messbar: \(Fmt.bytes(measured)))" }
-        if pane == .docker { msg += "\n\nDocker gibt den Platz teils verzögert an macOS zurück." }
-        if !errors.isEmpty { msg += "\n\nNicht möglich:\n" + errors.prefix(6).joined(separator: "\n") }
+        var msg = L("%d von %d Elementen entfernt.", done.count, selected.count) + "\n"
+        msg += trashed ? L("Im Papierkorb: ca. %@. Leere den Papierkorb, um den Platz freizugeben.", Fmt.bytes(estimated))
+                       : L("Freigegeben: ca. %@", Fmt.bytes(estimated))
+        if measured > 0 && !trashed { msg += " " + L("(sofort messbar: %@)", Fmt.bytes(measured)) }
+        if pane == .docker { msg += "\n\n" + L("Docker gibt den Platz teils verzögert an macOS zurück.") }
+        if !errors.isEmpty { msg += "\n\n" + L("Nicht möglich:") + "\n" + errors.prefix(6).joined(separator: "\n") }
+        offerEmptyTrash = trashed
         busy.remove(pane)
         status = ""
         DiskMonitor.shared.refresh()
         resultMessage = msg
         await scan(pane)
         await scan(.overview)
+    }
+
+    func emptyTrash() async {
+        status = L("Leere Papierkorb …")
+        do { try await Executor.run(.emptyTrash, extraProtected: [], useTrash: false) }
+        catch { resultMessage = error.localizedDescription }
+        status = ""
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        DiskMonitor.shared.refresh()
+    }
+
+    func languageChanged() {
+        lastScan = [:]
+        overview = []; caches = []; dev = []; docker = []; dockerSummary = []
     }
 
     // MARK: Verlauf
