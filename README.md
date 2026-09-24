@@ -20,6 +20,7 @@ On the MacBook it was built on, the first run took free space from **3.5 GB to 9
 |---|---|
 | **Docker** | Build cache and unused images that can be pulled again are preselected. Locally built images, stopped containers and orphaned volumes are listed with a warning and never preselected. |
 | **Dependencies** | `vendor/` next to a `composer.lock`, `node_modules/` next to a `package.json`, in projects untouched for 12 months (configurable). Restore with `composer install` / `npm install`. |
+| **Duplicate files** | Photos and videos in Pictures, Movies, Documents, Desktop and Downloads (folders and "all files from 1 MB" configurable). Compared by size, then first/last bytes, then SHA-256 over the whole file. One original always stays and a copy is only removed if that original is still there. The Photos library, app bundles and app working folders (e.g. CapCut, Final Cut) are never scanned; iCloud files that are not downloaded are skipped, and APFS clones are left out because deleting them frees nothing. |
 | **SQL dumps** | Files over 100 MB are compared by size, then SHA-256. Only true duplicates are preselected; the original stays. |
 | **Caches** | 30+ locations: browsers, Slack, Discord, VS Code, Cursor, npm, Composer, pnpm, Yarn, pip, Go, Gradle, CocoaPods, Xcode DerivedData, Homebrew, Playwright, Puppeteer, and caches of old JetBrains IDE versions. |
 
@@ -31,7 +32,7 @@ A menu bar item shows your free space and notifies you when it drops below a thr
 - Trash by default; permanent deletion is an opt-in setting.
 - Your home folder, Documents, Desktop, Library and your project folders themselves are protected paths.
 - Caches of running apps are locked until you quit the app.
-- Risky items (containers, volumes, locally built images, plugin dependencies) are never preselected.
+- Risky items (containers, volumes, locally built images, plugin dependencies, duplicates inside app folders) are never preselected.
 - No network calls, no analytics, no account.
 
 ## Install

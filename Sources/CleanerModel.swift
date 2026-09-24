@@ -68,6 +68,7 @@ final class CleanerModel: ObservableObject {
     @Published var swap: Int64?
     @Published var caches: [CleanItem] = []
     @Published var dev: [CleanItem] = []
+    @Published var duplicates: [CleanItem] = []
     @Published var docker: [CleanItem] = []
     @Published var dockerSummary: [String] = []
     @Published var dockerRaw: Int64?
@@ -95,6 +96,16 @@ final class CleanerModel: ObservableObject {
             dev = []
         }
     }
+    var dupRoots: [String] {
+        get { UserDefaults.standard.stringArray(forKey: "dupRoots") ?? DuplicateScanner.defaultRoots }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "dupRoots")
+            objectWillChange.send()
+            lastScan[.duplicates] = nil
+            duplicates = []
+        }
+    }
+    var dupAllFiles: Bool { UserDefaults.standard.bool(forKey: "dupAllFiles") }
     var useTrash: Bool { UserDefaults.standard.object(forKey: "useTrash") as? Bool ?? true }
     var inactiveMonths: Int {
         let v = UserDefaults.standard.integer(forKey: "inactiveMonths")
@@ -109,6 +120,7 @@ final class CleanerModel: ObservableObject {
         switch pane {
         case .caches: return caches
         case .dev: return dev
+        case .duplicates: return duplicates
         case .docker: return docker
         default: return []
         }
@@ -118,6 +130,7 @@ final class CleanerModel: ObservableObject {
         switch pane {
         case .caches: caches = items
         case .dev: dev = items
+        case .duplicates: duplicates = items
         case .docker: docker = items
         default: break
         }
@@ -143,7 +156,7 @@ final class CleanerModel: ObservableObject {
 
     func selectedCount(_ pane: Pane) -> Int { items(for: pane).filter(\.isActive).count }
 
-    var totalSelected: Int64 { selectedSize(.caches) + selectedSize(.dev) + selectedSize(.docker) }
+    var totalSelected: Int64 { selectedSize(.caches) + selectedSize(.duplicates) + selectedSize(.dev) + selectedSize(.docker) }
 
     func selectedSummary(_ pane: Pane) -> String {
         let sel = items(for: pane).filter(\.isActive)
@@ -188,6 +201,12 @@ final class CleanerModel: ObservableObject {
                 Task { @MainActor in CleanerModel.shared.status = s }
             }
             dev = d
+        case .duplicates:
+            status = L("Suche doppelte Dateien …")
+            let excl = projectRoots.map { URL(fileURLWithPath: Paths.expand($0)).resolvingSymlinksInPath().path }
+            duplicates = await DuplicateScanner.scan(roots: dupRoots, allFiles: dupAllFiles, exclude: excl) { s in
+                Task { @MainActor in CleanerModel.shared.status = s }
+            }
         case .docker:
             await scanDocker()
         default:
@@ -289,7 +308,7 @@ final class CleanerModel: ObservableObject {
 
     func languageChanged() {
         lastScan = [:]
-        overview = []; caches = []; dev = []; docker = []; dockerSummary = []
+        overview = []; caches = []; duplicates = []; dev = []; docker = []; dockerSummary = []
     }
 
     // MARK: Verlauf

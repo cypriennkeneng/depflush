@@ -2,13 +2,14 @@ import Foundation
 import AppKit
 
 enum Pane: String, CaseIterable, Identifiable, Hashable {
-    case overview, caches, dev, docker, history, settings
+    case overview, caches, duplicates, dev, docker, history, settings
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .overview: return L("Übersicht")
         case .caches: return L("Caches")
+        case .duplicates: return L("Duplikate")
         case .dev: return L("Entwicklung")
         case .docker: return L("Docker")
         case .history: return L("Verlauf")
@@ -20,6 +21,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .overview: return "chart.pie"
         case .caches: return "sparkles"
+        case .duplicates: return "doc.on.doc"
         case .dev: return "chevron.left.forwardslash.chevron.right"
         case .docker: return "shippingbox"
         case .history: return "clock.arrow.circlepath"
@@ -30,11 +32,18 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
 
 enum CleanAction {
     case delete([URL])
+    /// Löscht eine Kopie nur, wenn das Original noch unverändert vorhanden ist
+    case deleteCopy(URL, original: URL, size: Int64)
     case command(String, [String])
     case docker([String])
     case emptyTrash
 
-    var isFileDelete: Bool { if case .delete = self { return true } else { return false } }
+    var isFileDelete: Bool {
+        switch self {
+        case .delete, .deleteCopy: return true
+        default: return false
+        }
+    }
 }
 
 struct CleanItem: Identifiable {
@@ -86,28 +95,13 @@ enum Executor {
     static func run(_ action: CleanAction, extraProtected: [String], useTrash: Bool) async throws {
         switch action {
         case .delete(let urls):
-            for u in urls {
-                let fm = FileManager.default
-                let isLink = (try? u.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink ?? false
-                guard fm.fileExists(atPath: u.path) || isLink else { continue }
-                guard Safety.isAllowed(u, extraProtected: extraProtected) else {
-                    throw CleanError.blocked(Paths.tilde(u.path))
-                }
-                if useTrash {
-                    let err: String? = await withCheckedContinuation { c in
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            do { try FileManager.default.trashItem(at: u, resultingItemURL: nil); c.resume(returning: nil) }
-                            catch { c.resume(returning: error.localizedDescription) }
-                        }
-                    }
-                    if let err { throw CleanError.failed(err) }
-                } else {
-                    let r = await Shell.run("/bin/rm", ["-rf", "--", u.path], timeout: 3600)
-                    if r.status != 0 {
-                        throw CleanError.failed(r.err.trimmingCharacters(in: .whitespacesAndNewlines))
-                    }
-                }
+            for u in urls { try await remove(u, extraProtected: extraProtected, useTrash: useTrash) }
+        case .deleteCopy(let copy, let original, let size):
+            guard copy.standardizedFileURL.path != original.standardizedFileURL.path,
+                  FileInfo.size(original.path) == size else {
+                throw CleanError.failed(L("Original nicht mehr gefunden – Kopie wurde behalten"))
             }
+            try await remove(copy, extraProtected: extraProtected, useTrash: useTrash)
         case .command(let exe, let args):
             let r = await Shell.run(exe, args, timeout: 1800)
             if r.status != 0 { throw CleanError.failed(r.err.trimmingCharacters(in: .whitespacesAndNewlines)) }
@@ -125,4 +119,28 @@ enum Executor {
             }
         }
     }
+
+    private static func remove(_ u: URL, extraProtected: [String], useTrash: Bool) async throws {
+        let fm = FileManager.default
+        let isLink = (try? u.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink ?? false
+        guard fm.fileExists(atPath: u.path) || isLink else { return }
+        guard Safety.isAllowed(u, extraProtected: extraProtected) else {
+            throw CleanError.blocked(Paths.tilde(u.path))
+        }
+        if useTrash {
+            let err: String? = await withCheckedContinuation { c in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do { try FileManager.default.trashItem(at: u, resultingItemURL: nil); c.resume(returning: nil) }
+                    catch { c.resume(returning: error.localizedDescription) }
+                }
+            }
+            if let err { throw CleanError.failed(err) }
+        } else {
+            let r = await Shell.run("/bin/rm", ["-rf", "--", u.path], timeout: 3600)
+            if r.status != 0 {
+                throw CleanError.failed(r.err.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+    }
+
 }

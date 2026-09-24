@@ -10,24 +10,36 @@ struct ContentView: View {
     @State private var pane: Pane? = .overview
     @AppStorage("language") private var language = "system"
     @AppStorage("welcomeShown") private var welcomeShown = false
+    @State private var columns: NavigationSplitViewVisibility = .all
+
+    static let mainPanes: [Pane] = [.overview, .caches, .duplicates, .dev, .docker]
+    static let extraPanes: [Pane] = [.history, .settings]
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columns) {
             List(selection: $pane) {
+                Section {
+                    ForEach(Self.mainPanes) { p in
+                        NavigationLink(value: p) {
+                            Label(p.title, systemImage: p.icon)
+                        }
+                        .badge(badge(p))
+                    }
+                }
+                Section {
+                    ForEach(Self.extraPanes) { p in
+                        NavigationLink(value: p) {
+                            Label(p.title, systemImage: p.icon)
+                        }
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+            .safeAreaInset(edge: .top, spacing: 0) {
                 DiskCard()
-                    .padding(.vertical, 6)
-                Section {
-                    ForEach([Pane.overview, .caches, .dev, .docker]) { p in
-                        Label(p.title, systemImage: p.icon)
-                            .badge(badge(p))
-                            .tag(p)
-                    }
-                }
-                Section {
-                    ForEach([Pane.history, .settings]) { p in
-                        Label(p.title, systemImage: p.icon).tag(p)
-                    }
-                }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 10)
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 240)
         } detail: {
@@ -36,6 +48,11 @@ struct ContentView: View {
             case .caches:
                 CleanPaneView(pane: .caches,
                               subtitle: L("Zwischenspeicher, die sich von selbst neu aufbauen. Ist eine App geöffnet, wird ihr Cache übersprungen."))
+            case .duplicates:
+                CleanPaneView(pane: .duplicates,
+                              subtitle: L("Byte für Byte identische Dateien in: %@. Pro Gruppe bleibt immer ein Original erhalten.", model.dupRoots.joined(separator: ", ")),
+                              extra: AnyView(Callout(icon: "photo.on.rectangle",
+                                                     text: L("Die Fotos-Mediathek wird nie angefasst. Doppelte Fotos darin findest du in der Fotos-App unter „Duplikate“."))))
             case .dev:
                 if model.projectRoots.isEmpty {
                     ContentUnavailableView {
@@ -75,6 +92,7 @@ struct ContentView: View {
     }
 
     private func badge(_ p: Pane) -> Text? {
+        guard !model.busy.contains(p) else { return nil }
         let s = model.selectedSize(p)
         return s > 0 ? Text(Fmt.gbShort(s)) : nil
     }
@@ -519,6 +537,7 @@ struct SettingsView: View {
     @AppStorage("warnGB") private var warnGB = 20
     @AppStorage("useTrash") private var useTrash = true
     @AppStorage("language") private var language = "system"
+    @AppStorage("dupAllFiles") private var dupAllFiles = false
     @State private var loginItem = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
     @EnvironmentObject var model: CleanerModel
@@ -561,6 +580,27 @@ struct SettingsView: View {
                     }
                 }
                 Stepper(L("Projekte gelten als ruhend nach %d Monaten", inactiveMonths), value: $inactiveMonths, in: 1...48)
+            }
+            Section(L("Duplikate")) {
+                Picker(L("Suchen nach"), selection: $dupAllFiles) {
+                    Text(L("Fotos & Videos")).tag(false)
+                    Text(L("Alle Dateien ab 1 MB")).tag(true)
+                }
+                .onChange(of: dupAllFiles) { model.dupRoots = model.dupRoots }
+                ForEach(model.dupRoots, id: \.self) { r in
+                    HStack {
+                        Image(systemName: "folder")
+                        Text(r)
+                        Spacer()
+                        Button { model.dupRoots.removeAll { $0 == r } } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.borderless).help(L("Entfernen"))
+                    }
+                }
+                HStack {
+                    Button(L("Ordner hinzufügen …")) { addDupRoot() }
+                    Button(L("Standard wiederherstellen")) { model.dupRoots = DuplicateScanner.defaultRoots }
+                        .disabled(model.dupRoots == DuplicateScanner.defaultRoots)
+                }
             }
             Section(L("Menüleiste & Warnung")) {
                 Stepper(L("Warnen, wenn weniger als %d GB frei sind", warnGB), value: $warnGB, in: 5...200, step: 5)
@@ -606,6 +646,18 @@ struct SettingsView: View {
         if p.runModal() == .OK {
             let new = p.urls.map { Paths.tilde($0.path) }.filter { !model.projectRoots.contains($0) }
             model.projectRoots += new
+        }
+    }
+
+    private func addDupRoot() {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true
+        p.canChooseFiles = false
+        p.allowsMultipleSelection = true
+        p.directoryURL = URL(fileURLWithPath: Paths.home)
+        if p.runModal() == .OK {
+            let new = p.urls.map { Paths.tilde($0.path) }.filter { !model.dupRoots.contains($0) }
+            model.dupRoots += new
         }
     }
 

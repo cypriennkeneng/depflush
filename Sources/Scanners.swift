@@ -28,11 +28,11 @@ enum OverviewScanner {
             (L("Adobe"), "~/Library/Application Support/Adobe", nil, nil),
             (L("Slack"), "~/Library/Application Support/Slack", nil, nil),
             (L("Discord"), "~/Library/Application Support/discord", nil, nil),
-            (L("Filme"), "~/Movies", nil, nil),
-            (L("Downloads"), "~/Downloads", L("Selbst durchsehen – enthält oft persönliche Unterlagen"), nil),
+            (L("Filme"), "~/Movies", L("Doppelte Videos finden"), .duplicates),
+            (L("Downloads"), "~/Downloads", L("Selbst durchsehen – enthält oft persönliche Unterlagen"), .duplicates),
             (L("Dokumente"), "~/Documents", nil, nil),
             (L("Schreibtisch"), "~/Desktop", nil, nil),
-            (L("Bilder"), "~/Pictures", nil, nil),
+            (L("Bilder"), "~/Pictures", L("Doppelte Fotos finden"), .duplicates),
             (L("iPhone-Backups"), "~/Library/Application Support/MobileSync/Backup", L("Finder → iPhone → Backups verwalten"), nil),
             (L("Xcode / Developer"), "~/Library/Developer", nil, nil),
             (L("npm-Cache"), "~/.npm", nil, .caches),
@@ -143,6 +143,7 @@ enum CacheScanner {
         let jobs: [(Int, [URL])] = items.enumerated().map { (i, it) in
             switch it.action {
             case .delete(let u): return (i, u)
+            case .deleteCopy(let u, _, _): return (i, [u])
             case .command: return (i, [URL(fileURLWithPath: Paths.expand("~/Library/Caches/Homebrew"))])
             case .emptyTrash: return (i, [URL(fileURLWithPath: Paths.expand("~/.Trash"))])
             case .docker: return (i, [])

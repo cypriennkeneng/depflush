@@ -117,6 +117,26 @@ enum Sizer {
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Schnellvergleich: erste und letzte 64 KB
+    static func quickHash(_ url: URL) -> String? {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? h.close() }
+        var hasher = SHA256()
+        guard let head = try? h.read(upToCount: 65_536) else { return nil }
+        hasher.update(data: head)
+        if let end = try? h.seekToEnd(), end > 131_072 {
+            try? h.seek(toOffset: end - 65_536)
+            if let tail = try? h.read(upToCount: 65_536) { hasher.update(data: tail) }
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func quickHashAsync(_ url: URL) async -> String? {
+        await withCheckedContinuation { (c: CheckedContinuation<String?, Never>) in
+            DispatchQueue.global(qos: .utility).async { c.resume(returning: quickHash(url)) }
+        }
+    }
+
     static func sha256Async(_ url: URL) async -> String? {
         await withCheckedContinuation { (c: CheckedContinuation<String?, Never>) in
             DispatchQueue.global(qos: .utility).async { c.resume(returning: sha256(url)) }

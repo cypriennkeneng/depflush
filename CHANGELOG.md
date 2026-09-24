@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0 – 2026-09-24
+- New **Duplicates** section: finds identical photos and videos (optionally all files from 1 MB) in Pictures, Movies, Documents, Desktop and Downloads
+- Size → first/last 64 KB → SHA-256; the original stays, and a copy is only removed if the original still exists
+- Skips the Photos library, app bundles and app working folders, iCloud-only files, hard links and APFS clones
+- Duplicate folders and file types configurable in Settings
+- Sidebar no longer disappears after clicking an item
+
 ## 1.2.1 – 2026-09-24
 - Source code published under GPL-3.0
 - "Source code on GitHub" link under Settings → About
