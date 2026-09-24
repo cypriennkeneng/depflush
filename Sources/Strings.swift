@@ -254,4 +254,5 @@ let translations: [String: [String]] = [
     "Entwickelt von Webloupe – Shopware-Entwicklung & Updates": ["Made by Webloupe – Shopware development & updates", "Développé par Webloupe – développement et mises à jour Shopware"],
     "Depflush unterstützen – spendier uns einen Kaffee": ["Support Depflush – buy us a coffee", "Soutenir Depflush – offre-nous un café"],
     "Hat geholfen? Spendier uns einen Kaffee": ["Helped you? Buy us a coffee", "Ça t'a aidé ? Offre-nous un café"],
+    "Quellcode auf GitHub (GPL-3.0)": ["Source code on GitHub (GPL-3.0)", "Code source sur GitHub (GPL-3.0)"],
 ]

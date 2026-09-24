@@ -8,8 +8,8 @@
     <key>CFBundleExecutable</key><string>Depflush</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.2.0</string>
-    <key>CFBundleVersion</key><string>3</string>
+    <key>CFBundleShortVersionString</key><string>1.2.1</string>
+    <key>CFBundleVersion</key><string>4</string>
     <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>CFBundleLocalizations</key><array><string>de</string><string>en</string><string>fr</string></array>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
@@ -17,6 +17,6 @@
     <key>NSHighResolutionCapable</key><true/>
     <key>NSAppleEventsUsageDescription</key><string>Depflush asks Finder to empty the Trash.</string>
     <key>DepflushSupportURL</key><string>https://ko-fi.com/depflush</string>
-    <key>NSHumanReadableCopyright</key><string>© 2026 Webloupe · depflush.com</string>
+    <key>NSHumanReadableCopyright</key><string>© 2026 Web Loupe · GPL-3.0 · depflush.com</string>
 </dict>
 </plist>

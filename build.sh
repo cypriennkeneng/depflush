@@ -39,4 +39,7 @@ if [ "$1" = "--install" ]; then
   cp -R "$APP" ~/Applications/
   open ~/Applications/Depflush.app
 fi
-echo "✓ Fertig"
+mkdir -p dist
+rm -f dist/Depflush.zip
+ditto -c -k --sequesterRsrc --keepParent "$APP" dist/Depflush.zip
+echo "✓ Fertig (dist/Depflush.zip)"
