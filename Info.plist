@@ -16,7 +16,7 @@
     <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSAppleEventsUsageDescription</key><string>Depflush asks Finder to empty the Trash.</string>
-    <key>DepflushSupportURL</key><string></string>
+    <key>DepflushSupportURL</key><string>https://ko-fi.com/depflush</string>
     <key>NSHumanReadableCopyright</key><string>© 2026 Webloupe · depflush.com</string>
 </dict>
 </plist>

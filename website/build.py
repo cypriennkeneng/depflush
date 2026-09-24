@@ -14,6 +14,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 SRC = os.path.join(HERE, "src", "index.html")
 OUT = os.path.join(HERE, "public")
+# Ko-fi-/Buy-Me-a-Coffee-Seite – hier eintragen, z. B. "https://ko-fi.com/depflush"
+SUPPORT_URL = "https://ko-fi.com/depflush"
+
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
 def curl(url, dest=None):
@@ -56,6 +59,12 @@ def main():
         name = os.path.basename(z)
         src = re.sub(r"download/Depflush-[0-9.]+\.zip", "download/" + name, src)
         print("Download:", name)
+
+    # 2b. Spendenlink
+    if SUPPORT_URL:
+        src = src.replace('href="https://ko-fi.com/"', f'href="{SUPPORT_URL}"')
+    else:
+        print("Hinweis: SUPPORT_URL ist leer – der Spendenbutton zeigt auf ko-fi.com")
 
     # 3. Favicon
     icon = os.path.join(ROOT, "Resources", "icon_1024.png")
