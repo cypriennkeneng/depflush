@@ -60,7 +60,6 @@ cd depflush
 | `Sources/Shell.swift` | Shell helpers, sizes, protected paths |
 | `Sources/Views.swift`, `MenuBar.swift` | SwiftUI interface |
 | `Sources/Strings.swift` | Translations (DE → EN, FR) |
-| `website/` | Source of depflush.com |
 
 ## Contributing
 
