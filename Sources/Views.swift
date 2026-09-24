@@ -585,7 +585,7 @@ struct SettingsView: View {
                     }
                 }
                 Link(destination: URL(string: "https://depflush.com")!) { Label("depflush.com", systemImage: "globe") }
-                Link(destination: URL(string: "https://github.com/webloupe/depflush")!) {
+                Link(destination: URL(string: "https://github.com/cypriennkeneng/depflush")!) {
                     Label(L("Quellcode auf GitHub (GPL-3.0)"), systemImage: "chevron.left.forwardslash.chevron.right")
                 }
                 Link(destination: URL(string: "https://webloupe.de")!) {

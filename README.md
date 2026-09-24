@@ -5,7 +5,7 @@
 <p align="center">A free Mac app that finds the gigabytes development leaves behind.</p>
 
 <p align="center">
-  <a href="https://github.com/webloupe/depflush/releases/latest">Download</a> ·
+  <a href="https://github.com/cypriennkeneng/depflush/releases/latest">Download</a> ·
   <a href="https://depflush.com">Website</a> ·
   <a href="https://ko-fi.com/depflush">Support on Ko-fi</a>
 </p>
@@ -36,7 +36,7 @@ A menu bar item shows your free space and notifies you when it drops below a thr
 
 ## Install
 
-1. Download `Depflush.zip` from the [latest release](https://github.com/webloupe/depflush/releases/latest), unzip, move Depflush to Applications.
+1. Download `Depflush.zip` from the [latest release](https://github.com/cypriennkeneng/depflush/releases/latest), unzip, move Depflush to Applications.
 2. Depflush is not notarized by Apple yet. On first launch, open **System Settings → Privacy & Security** and click **Open Anyway**.
 
 Requires macOS 14 Sonoma or later. Runs on Apple Silicon and Intel. English, Deutsch, Français.
@@ -46,7 +46,7 @@ Requires macOS 14 Sonoma or later. Runs on Apple Silicon and Intel. English, Deu
 No Xcode project and no dependencies. You only need the Xcode Command Line Tools (Swift 6).
 
 ```sh
-git clone https://github.com/webloupe/depflush.git
+git clone https://github.com/cypriennkeneng/depflush.git
 cd depflush
 ./build.sh            # builds build/Depflush.app (universal binary)
 ./build.sh --install  # builds, copies to ~/Applications and launches
