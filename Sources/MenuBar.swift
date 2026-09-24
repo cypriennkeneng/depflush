@@ -44,6 +44,12 @@ struct MenuBarPanel: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if let support = AppInfo.supportURL, !model.history.isEmpty {
+                Link(destination: support) {
+                    Label(L("Hat geholfen? Spendier uns einen Kaffee"), systemImage: "cup.and.saucer")
+                }
+                .font(.caption)
+            }
             Divider()
             HStack {
                 Button {

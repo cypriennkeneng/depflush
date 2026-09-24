@@ -579,6 +579,11 @@ struct SettingsView: View {
             Section(L("Über")) {
                 LabeledContent(L("Version"), value: AppInfo.version)
                 LabeledContent(L("Verlauf"), value: "~/Library/Application Support/Depflush")
+                if let support = AppInfo.supportURL {
+                    Link(destination: support) {
+                        Label(L("Depflush unterstützen – spendier uns einen Kaffee"), systemImage: "cup.and.saucer")
+                    }
+                }
                 Link(destination: URL(string: "https://depflush.com")!) { Label("depflush.com", systemImage: "globe") }
                 Link(destination: URL(string: "https://webloupe.de")!) {
                     Label(L("Entwickelt von Webloupe – Shopware-Entwicklung & Updates"), systemImage: "hammer")

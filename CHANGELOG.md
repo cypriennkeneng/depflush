@@ -4,6 +4,7 @@
 - Neuer Name: **Depflush** (vorher „Aufräumer“), Bundle-ID de.webloupe.depflush
 - Einstellungen und Verlauf der Vorgängerversion werden automatisch übernommen
 - Links zu depflush.com und Webloupe unter „Über“
+- Optionaler Spendenlink (Info.plist → DepflushSupportURL) unter „Über“ und in der Menüleiste nach dem ersten Aufräumen
 
 ## 1.1.0 – 2026-09-24
 - Sprachen: Deutsch, Englisch, Französisch (Systemsprache oder in den Einstellungen wählbar)

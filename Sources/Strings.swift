@@ -5,6 +5,11 @@ import Foundation
 
 enum AppInfo {
     static var name: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Depflush" }
+    /// Spendenlink (Ko-fi o. ä.) aus Info.plist → DepflushSupportURL; leer = ausgeblendet
+    static var supportURL: URL? {
+        guard let s = Bundle.main.object(forInfoDictionaryKey: "DepflushSupportURL") as? String, !s.isEmpty else { return nil }
+        return URL(string: s)
+    }
     static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0" }
 }
 
@@ -247,4 +252,6 @@ let translations: [String: [String]] = [
     "Willkommensbildschirm erneut zeigen": ["Show welcome screen again", "Revoir l'écran d'accueil"],
     "Konnte nicht geändert werden: %@": ["Could not be changed: %@", "Modification impossible : %@"],
     "Entwickelt von Webloupe – Shopware-Entwicklung & Updates": ["Made by Webloupe – Shopware development & updates", "Développé par Webloupe – développement et mises à jour Shopware"],
+    "Depflush unterstützen – spendier uns einen Kaffee": ["Support Depflush – buy us a coffee", "Soutenir Depflush – offre-nous un café"],
+    "Hat geholfen? Spendier uns einen Kaffee": ["Helped you? Buy us a coffee", "Ça t'a aidé ? Offre-nous un café"],
 ]
