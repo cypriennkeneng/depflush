@@ -3,7 +3,8 @@
 
 - src/index.html ist die Quelle (dieselbe Datei wie die Claude-Vorschau)
 - Google Fonts werden heruntergeladen und lokal ausgeliefert (DSGVO: keine Verbindung zu Google)
-- der neueste ZIP-Build aus ../dist/ wird nach public/download/ kopiert
+- Download-Links zeigen auf GitHub Releases
+- Dateien aus static/ (.htaccess, robots.txt, sitemap.xml) werden mitkopiert
 - Favicon aus ../Resources/icon_1024.png
 
 Aufruf:  python3 website/build.py
@@ -31,7 +32,6 @@ def main():
     if os.path.isdir(OUT):
         shutil.rmtree(OUT)
     os.makedirs(os.path.join(OUT, "fonts"))
-    os.makedirs(os.path.join(OUT, "download"))
 
     # 1. Schriften lokal
     m = re.search(r'<link rel="stylesheet" href="(https://fonts\.googleapis\.com/[^"]+)">', src)
@@ -51,14 +51,7 @@ def main():
         src = re.sub(r'\s*<link rel="preconnect"[^>]*>', "", src)
         src = src.replace(m.group(0), '<link rel="stylesheet" href="fonts/fonts.css">')
 
-    # 2. Download-Links relativ
-    src = src.replace("https://depflush.com/download/", "download/")
-    zips = sorted(glob.glob(os.path.join(ROOT, "dist", "Depflush-*.zip")), key=os.path.getmtime)
-    for z in zips[-1:]:
-        shutil.copy2(z, os.path.join(OUT, "download"))
-        name = os.path.basename(z)
-        src = re.sub(r"download/Depflush-[0-9.]+\.zip", "download/" + name, src)
-        print("Download:", name)
+    # 2. Download: Links zeigen auf GitHub Releases
 
     # 2b. Spendenlink
     if SUPPORT_URL:
@@ -72,6 +65,12 @@ def main():
         for size, fname in ((64, "favicon.png"), (180, "apple-touch-icon.png"), (512, "og-icon.png")):
             subprocess.run(["sips", "-z", str(size), str(size), icon, "--out", os.path.join(OUT, fname)],
                            check=False, capture_output=True)
+
+    # 3b. Statische Dateien (.htaccess, robots.txt, sitemap.xml)
+    static_dir = os.path.join(HERE, "static")
+    if os.path.isdir(static_dir):
+        for name in os.listdir(static_dir):
+            shutil.copy2(os.path.join(static_dir, name), os.path.join(OUT, name))
 
     # 4. Vollständiges Dokument
     split = src.index("<header")
