@@ -53,6 +53,19 @@ cd depflush
 ./build.sh --install  # builds, copies to ~/Applications and launches
 ```
 
+### Signing and notarization (maintainers)
+
+Every build uses the Hardened Runtime. Without a Developer ID certificate, `build.sh` signs ad-hoc, which is what the current releases are. Once an [Apple Developer Program](https://developer.apple.com/programs/) membership is active:
+
+1. Create a **Developer ID Application** certificate (Xcode → Settings → Accounts → Manage Certificates, or developer.apple.com) so it is in your login keychain.
+2. Store notarization credentials once, using an [app-specific password](https://account.apple.com):
+   ```sh
+   xcrun notarytool store-credentials depflush-notary \
+     --apple-id you@example.com --team-id TEAMID1234 --password abcd-efgh-ijkl-mnop
+   ```
+3. `cp .signing.env.example .signing.env` and fill in the certificate name and profile (the file is git-ignored).
+4. `./build.sh --release` signs with Developer ID, submits to Apple, staples the ticket and writes `dist/Depflush.zip`, ready to attach to a GitHub release.
+
 | Path | Purpose |
 |---|---|
 | `Sources/Scanners.swift` | Rules: caches, dependencies, SQL dumps, Docker |
