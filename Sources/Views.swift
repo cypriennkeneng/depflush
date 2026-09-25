@@ -7,7 +7,7 @@ import ServiceManagement
 struct ContentView: View {
     @EnvironmentObject var model: CleanerModel
     @EnvironmentObject var disk: DiskMonitor
-    @State private var pane: Pane? = .overview
+    @State private var pane: Pane = .overview
     @AppStorage("language") private var language = "system"
     @AppStorage("welcomeShown") private var welcomeShown = false
     @State private var columns: NavigationSplitViewVisibility = .all
@@ -17,20 +17,16 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
-            List(selection: $pane) {
+            // Eigene Auswahl statt List(selection:) – die native Auswahl setzte sich bei manchen Zeilen auf „nichts“ zurück
+            List {
                 Section {
                     ForEach(Self.mainPanes) { p in
-                        NavigationLink(value: p) {
-                            Label(p.title, systemImage: p.icon)
-                        }
-                        .badge(badge(p))
+                        SidebarRow(pane: p, selected: pane == p, badge: badge(p)) { pane = p }
                     }
                 }
                 Section {
                     ForEach(Self.extraPanes) { p in
-                        NavigationLink(value: p) {
-                            Label(p.title, systemImage: p.icon)
-                        }
+                        SidebarRow(pane: p, selected: pane == p, badge: nil) { pane = p }
                     }
                 }
             }
@@ -43,7 +39,7 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 240)
         } detail: {
-            switch pane ?? .overview {
+            switch pane {
             case .overview: OverviewView(pane: $pane)
             case .caches:
                 CleanPaneView(pane: .caches,
@@ -91,10 +87,43 @@ struct ContentView: View {
         }
     }
 
-    private func badge(_ p: Pane) -> Text? {
+    private func badge(_ p: Pane) -> String? {
         guard !model.busy.contains(p) else { return nil }
         let s = model.selectedSize(p)
-        return s > 0 ? Text(Fmt.gbShort(s)) : nil
+        return s > 0 ? Fmt.gbShort(s) : nil
+    }
+}
+
+struct SidebarRow: View {
+    let pane: Pane
+    let selected: Bool
+    let badge: String?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: pane.icon)
+                    .frame(width: 18)
+                    .foregroundStyle(selected ? Color.white : Color.accentColor)
+                Text(pane.title)
+                    .foregroundStyle(selected ? Color.white : Color.primary)
+                Spacer(minLength: 4)
+                if let badge {
+                    Text(badge)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(selected ? Color.white : Color.secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Color.accentColor : Color.clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -157,7 +186,9 @@ struct PaneHeader: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(pane.title).font(.largeTitle.weight(.semibold))
-                Text(subtitle).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                // Kein fixedSize: bei schmaler Messbreite wurde der Text sonst über 1000 pt hoch und schob
+                // das ganze Fenster (inkl. Seitenleiste) aus dem sichtbaren Bereich
+                Text(subtitle).foregroundStyle(.secondary).lineLimit(1...4)
             }
             Spacer(minLength: 20)
             VStack(alignment: .trailing, spacing: 4) {
@@ -182,7 +213,7 @@ struct PaneHeader: View {
 // MARK: - Übersicht
 
 struct OverviewView: View {
-    @Binding var pane: Pane?
+    @Binding var pane: Pane
     @EnvironmentObject var model: CleanerModel
     @EnvironmentObject var disk: DiskMonitor
 
@@ -249,7 +280,7 @@ struct Callout: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon).foregroundStyle(.blue)
-            Text(text).fixedSize(horizontal: false, vertical: true)
+            Text(text).lineLimit(1...5)
             Spacer()
         }
         .padding(12)
@@ -362,6 +393,7 @@ struct CleanPaneView: View {
 
             FooterBar(pane: pane, confirm: $confirm)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: pane) {
             if model.lastScan[pane] == nil { await model.scan(pane) }
         }
