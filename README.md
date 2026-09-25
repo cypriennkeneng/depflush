@@ -44,6 +44,14 @@ A menu bar item shows your free space and notifies you when it drops below a thr
 
 ## Install
 
+With [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask cypriennkeneng/tap/depflush
+```
+
+Or by hand:
+
 1. Download `Depflush.zip` from the [latest release](https://github.com/cypriennkeneng/depflush/releases/latest), unzip, move Depflush to Applications.
 2. Depflush is not notarized by Apple yet. On first launch, open **System Settings → Privacy & Security** and click **Open Anyway**.
 

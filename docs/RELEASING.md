@@ -19,6 +19,7 @@ Every build uses the Hardened Runtime. Without a Developer ID certificate, `buil
 2. Commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
 3. `./build.sh --release` (or `./build.sh` while releases are still ad-hoc signed).
 4. `gh release create vX.Y.Z dist/Depflush.zip -R cypriennkeneng/depflush --title "Depflush X.Y.Z" --notes "…"`
+5. Update the Homebrew cask: in the [homebrew-tap](https://github.com/cypriennkeneng/homebrew-tap) repo run `./bump.sh X.Y.Z`, then commit and push.
 
 The website's download button points to `releases/latest/download/Depflush.zip`, so it serves the new version as soon as the release exists.
 
