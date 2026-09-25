@@ -147,13 +147,20 @@ enum Sizer {
 // MARK: - Formatierung
 
 enum Fmt {
+    /// Dateigröße in der App-Sprache (nicht der Systemsprache): 1,93 GB · 1.93 GB · 1,93 Go
     static func bytes(_ b: Int64?) -> String {
         guard let b else { return "–" }
-        if b <= 0 { return "0 KB" }
-        let f = ByteCountFormatter()
-        f.countStyle = .file
-        f.allowedUnits = [.useKB, .useMB, .useGB, .useTB]
-        return f.string(fromByteCount: b)
+        let units = L10n.current == "fr" ? ["ko", "Mo", "Go", "To"] : ["KB", "MB", "GB", "TB"]
+        if b <= 0 { return "0 " + units[0] }
+        var v = Double(b) / 1000
+        var i = 0
+        while v >= 999.5 && i < units.count - 1 { v /= 1000; i += 1 }
+        let f = NumberFormatter()
+        f.locale = L10n.locale
+        f.numberStyle = .decimal
+        f.minimumFractionDigits = 0
+        f.maximumFractionDigits = i == 0 ? 0 : (i == 1 ? 1 : 2)
+        return (f.string(from: NSNumber(value: v)) ?? String(format: "%.1f", v)) + "\u{00A0}" + units[i]
     }
 
     static func gbShort(_ b: Int64) -> String {

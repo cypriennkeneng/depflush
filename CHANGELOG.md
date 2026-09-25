@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Sizes follow the language chosen in the app (1.93 GB · 1,93 GB · 1,93 Go) instead of the system language
+- Screenshots in the README (`docs/screenshots/`) and a social preview image (`docs/social-preview.png`)
+
 ## 1.3.0 – 2026-09-24
 - New **Duplicates** section: finds identical photos and videos (optionally all files from 1 MB) in Pictures, Movies, Documents, Desktop and Downloads
 - Size → first/last 64 KB → SHA-256; the original stays, and a copy is only removed if the original still exists

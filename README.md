@@ -12,6 +12,8 @@
 
 Docker images, the `vendor` and `node_modules` folders of projects you haven't touched in a year, duplicate SQL dumps and caches from IDE versions you no longer use. Depflush lists every item with its size before anything moves, and by default everything goes to the Trash.
 
+<p align="center"><img src="docs/screenshots/overview.png" width="860" alt="Depflush overview: free and used space and the largest areas such as Docker Desktop, projects, app caches and pictures"></p>
+
 On the MacBook it was built on, the first run took free space from **3.5 GB to 95 GB**.
 
 ## What it finds
@@ -23,6 +25,11 @@ On the MacBook it was built on, the first run took free space from **3.5 GB to 9
 | **Duplicate files** | Photos and videos in Pictures, Movies, Documents, Desktop and Downloads (folders and "all files from 1 MB" configurable). Compared by size, then first/last bytes, then SHA-256 over the whole file. One original always stays and a copy is only removed if that original is still there. The Photos library, app bundles and app working folders (e.g. CapCut, Final Cut) are never scanned; iCloud files that are not downloaded are skipped, and APFS clones are left out because deleting them frees nothing. |
 | **SQL dumps** | Files over 100 MB are compared by size, then SHA-256. Only true duplicates are preselected; the original stays. |
 | **Caches** | 30+ locations: browsers, Slack, Discord, VS Code, Cursor, npm, Composer, pnpm, Yarn, pip, Go, Gradle, CocoaPods, Xcode DerivedData, Homebrew, Playwright, Puppeteer, and caches of old JetBrains IDE versions. |
+
+<p align="center">
+  <img src="docs/screenshots/docker.png" width="420" alt="Docker section with build cache and unused images ticked">
+  <img src="docs/screenshots/duplicates.png" width="420" alt="Duplicates section listing copies of photos and videos next to the original that stays">
+</p>
 
 A menu bar item shows your free space and notifies you when it drops below a threshold.
 
