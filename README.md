@@ -60,18 +60,7 @@ cd depflush
 ./build.sh --install  # builds, copies to ~/Applications and launches
 ```
 
-### Signing and notarization (maintainers)
-
-Every build uses the Hardened Runtime. Without a Developer ID certificate, `build.sh` signs ad-hoc, which is what the current releases are. Once an [Apple Developer Program](https://developer.apple.com/programs/) membership is active:
-
-1. Create a **Developer ID Application** certificate (Xcode → Settings → Accounts → Manage Certificates, or developer.apple.com) so it is in your login keychain.
-2. Store notarization credentials once, using an [app-specific password](https://account.apple.com):
-   ```sh
-   xcrun notarytool store-credentials depflush-notary \
-     --apple-id you@example.com --team-id TEAMID1234 --password abcd-efgh-ijkl-mnop
-   ```
-3. `cp .signing.env.example .signing.env` and fill in the certificate name and profile (the file is git-ignored).
-4. `./build.sh --release` signs with Developer ID, submits to Apple, staples the ticket and writes `dist/Depflush.zip`, ready to attach to a GitHub release.
+Releases are signed and published by the maintainer; see [docs/RELEASING.md](docs/RELEASING.md).
 
 | Path | Purpose |
 |---|---|
@@ -88,8 +77,10 @@ Contributions are welcome, especially new cache locations. See [CONTRIBUTING.md]
 
 ## License
 
-Depflush is released under the [GNU General Public License v3.0](LICENSE).
+The source code is released under the [GNU General Public License v3.0](LICENSE). Copyright © 2026 Web Loupe (Cyprien Nkeneng).
 
-The name "Depflush" and the app icon are not covered by the license. If you publish a fork, please give it a different name and icon.
+### Name and logo
+
+"Depflush" and the Depflush icon identify the official app published at [depflush.com](https://depflush.com) and in this repository. They are not licensed under the GPL. You are welcome to fork and modify the code under the GPL, but a version you distribute must use a different name and icon and must not suggest that it is the official app or endorsed by Web Loupe. Mentioning that your project is based on Depflush is fine.
 
 Made by [Web Loupe](https://webloupe.de), a Shopware partner in Berlin.

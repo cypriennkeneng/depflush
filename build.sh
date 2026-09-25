@@ -10,7 +10,7 @@
 #     eine Warnung; Nutzer müssen unter Systemeinstellungen → Datenschutz & Sicherheit „Trotzdem öffnen“.
 #   - Mit Zertifikat (und .signing.env) wird mit Developer ID signiert; mit --release zusätzlich
 #     notarisiert und das Ticket angeheftet. Dann startet die App ohne Warnung.
-#   Einrichtung: siehe README → „Signing and notarization“.
+#   Einrichtung: siehe docs/RELEASING.md.
 set -e
 cd "$(dirname "$0")"
 APP="build/Depflush.app"
@@ -72,7 +72,7 @@ zip_app
 if [ $RELEASE = 1 ]; then
   if [ -z "$DEVELOPER_ID" ] || [ -z "$NOTARY_PROFILE" ]; then
     echo "✗ --release braucht ein Developer-ID-Zertifikat und NOTARY_PROFILE in .signing.env" >&2
-    echo "  (siehe README → „Signing and notarization“)" >&2
+    echo "  (siehe docs/RELEASING.md)" >&2
     exit 1
   fi
   echo "→ Bei Apple notarisieren (dauert meist 1–5 Minuten)"
