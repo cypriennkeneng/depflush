@@ -68,7 +68,7 @@ cd depflush
 ./build.sh --install  # builds, copies to ~/Applications and launches
 ```
 
-Releases are signed and published by the maintainer; see [docs/RELEASING.md](docs/RELEASING.md).
+Releases are signed and published by the maintainer.
 
 | Path | Purpose |
 |---|---|

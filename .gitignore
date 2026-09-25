@@ -4,3 +4,4 @@ dist/
 *.xcuserstate
 .idea/
 .signing.env
+docs/RELEASING.md
