@@ -10,6 +10,10 @@
   <a href="https://ko-fi.com/depflush">Support on Ko-fi</a>
 </p>
 
+<p align="center">
+  <a href="https://alternativeto.net/software/depflush/about/"><img src="https://alternativeto.net/static/badges/badge-compact-color.svg" width="171" height="55" alt="Depflush on AlternativeTo"></a>
+</p>
+
 Docker images, the `vendor` and `node_modules` folders of projects you haven't touched in a year, duplicate SQL dumps and caches from IDE versions you no longer use. Depflush lists every item with its size before anything moves, and by default everything goes to the Trash.
 
 <p align="center"><img src="docs/screenshots/overview.png" width="860" alt="Depflush overview: free and used space and the largest areas such as Docker Desktop, projects, app caches and pictures"></p>
