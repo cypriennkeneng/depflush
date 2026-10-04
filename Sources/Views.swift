@@ -223,10 +223,12 @@ struct OverviewView: View {
                 PaneHeader(pane: .overview, subtitle: L("Wo dein Speicher steckt und was sich aufräumen lässt."))
 
                 HStack(spacing: 14) {
-                    StatTile(title: L("Frei"), value: Fmt.bytes(disk.free), icon: "checkmark.circle", tint: disk.isLow ? .red : .green)
+                    StatTile(title: L("Frei"), value: Fmt.bytes(disk.free), icon: "checkmark.circle", tint: disk.isLow ? .red : .green,
+                             detail: disk.purgeable >= 1_000_000_000 ? L("davon %@ von macOS bei Bedarf freigegeben", Fmt.bytes(disk.purgeable)) : nil)
                     StatTile(title: L("Belegt"), value: Fmt.bytes(max(0, disk.total - disk.free)), icon: "internaldrive", tint: .blue)
                     StatTile(title: L("Zum Aufräumen vorgemerkt"), value: Fmt.bytes(model.totalSelected), icon: "sparkles", tint: .orange)
                 }
+                .fixedSize(horizontal: false, vertical: true)
 
                 if let swap = model.swap, swap > 2_000_000_000 {
                     Callout(icon: "arrow.triangle.2.circlepath",
@@ -263,12 +265,16 @@ struct StatTile: View {
     let value: String
     let icon: String
     let tint: Color
+    var detail: String? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(title, systemImage: icon).font(.callout).foregroundStyle(tint)
             Text(value).font(.system(size: 26, weight: .semibold, design: .rounded)).monospacedDigit()
+            if let detail {
+                Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1...3)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(16)
         .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }

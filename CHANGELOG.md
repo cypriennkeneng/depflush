@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Free space now matches System Settings → Storage: it includes space macOS frees on demand (local Time Machine snapshots, iCloud copies), shown as "incl. … macOS frees when needed" ([#2](https://github.com/cypriennkeneng/depflush/issues/2))
+- Disk stats update every 10 seconds and when the window becomes active, without a rescan
 - Sizes follow the language chosen in the app (1.93 GB · 1,93 GB · 1,93 Go) instead of the system language
 - Screenshots in the README (`docs/screenshots/`) and a social preview image (`docs/social-preview.png`)
 

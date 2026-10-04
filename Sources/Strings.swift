@@ -200,6 +200,7 @@ let translations: [String: [String]] = [
     "Wo dein Speicher steckt und was sich aufräumen lässt.": ["Where your storage goes and what can be cleaned up.", "Où part ton espace disque et ce qui peut être nettoyé."],
     "Frei": ["Free", "Libre"],
     "Belegt": ["Used", "Utilisé"],
+    "davon %@ von macOS bei Bedarf freigegeben": ["incl. %@ macOS frees when needed", "dont %@ libérés par macOS au besoin"],
     "Zum Aufräumen vorgemerkt": ["Marked for cleanup", "Sélectionné pour le nettoyage"],
     "Die Auslagerungsdatei (Swap) belegt %@. Ein Neustart des Macs gibt diesen Platz frei.": ["The swap file uses %@. Restarting your Mac frees this space.", "Le fichier d'échange (swap) occupe %@. Redémarrer le Mac libère cet espace."],
     "Größte Bereiche": ["Largest areas", "Plus gros postes"],

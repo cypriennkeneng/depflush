@@ -8,10 +8,15 @@ import UserNotifications
 final class DiskMonitor: ObservableObject {
     static let shared = DiskMonitor()
 
+    /// Verfügbar wie in Systemeinstellungen → Speicher (inkl. Platz, den macOS bei Bedarf selbst freigibt)
     @Published var free: Int64 = 0
     @Published var total: Int64 = 0
+    /// Davon „löschbar“: lokale Time-Machine-Snapshots, iCloud-Kopien, Systemcaches
+    @Published var purgeable: Int64 = 0
     private var timer: Timer?
+    private var observers: [NSObjectProtocol] = []
     private var warned = false
+    private var refreshing = false
 
     var thresholdGB: Int {
         let v = UserDefaults.standard.integer(forKey: "warnGB")
@@ -20,25 +25,54 @@ final class DiskMonitor: ObservableObject {
     var isLow: Bool { total > 0 && free < Int64(thresholdGB) * 1_000_000_000 }
     var usedFraction: Double { total > 0 ? Double(total - free) / Double(total) : 0 }
 
-    nonisolated static func current() -> (free: Int64, total: Int64) {
-        let url = URL(fileURLWithPath: NSHomeDirectory())
-        let v = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey, .volumeTotalCapacityKey])
-        return (Int64(v?.volumeAvailableCapacity ?? 0), Int64(v?.volumeTotalCapacity ?? 0))
+    /// Liest die Werte frisch vom Dateisystem (neue URL, damit keine zwischengespeicherten Werte zurückkommen).
+    /// `free` entspricht „Verfügbar“ in den Systemeinstellungen: freie Blöcke plus Platz, den macOS
+    /// bei Bedarf selbst freigibt (lokale Snapshots, iCloud-Kopien). `purgeable` ist dieser Anteil.
+    nonisolated static func current() -> (free: Int64, total: Int64, purgeable: Int64) {
+        var url = URL(fileURLWithPath: NSHomeDirectory())
+        url.removeAllCachedResourceValues()
+        let v = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey,
+                                                  .volumeAvailableCapacityForImportantUsageKey,
+                                                  .volumeTotalCapacityKey])
+        let raw = Int64(v?.volumeAvailableCapacity ?? 0)
+        let important = v?.volumeAvailableCapacityForImportantUsage ?? 0
+        let free = important > 0 ? max(important, raw) : raw
+        return (free, Int64(v?.volumeTotalCapacity ?? 0), max(0, free - raw))
     }
 
     func start() {
         refresh()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+        // Alle 10 s nachmessen, damit auch Änderungen außerhalb der App (Papierkorb geleert,
+        // Snapshots von macOS entfernt, Downloads) ohne neuen Scan sichtbar werden.
+        timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
             Task { @MainActor in DiskMonitor.shared.refresh() }
+        }
+        timer?.tolerance = 2
+        let nc = NotificationCenter.default
+        observers = [NSApplication.didBecomeActiveNotification, NSWindow.didBecomeKeyNotification].map {
+            nc.addObserver(forName: $0, object: nil, queue: .main) { _ in
+                Task { @MainActor in DiskMonitor.shared.refresh() }
+            }
         }
     }
 
+    /// Misst im Hintergrund, weil die Berechnung des löschbaren Anteils einen Moment dauern kann.
     func refresh() {
-        let c = Self.current()
-        free = c.free
-        total = c.total
+        guard !refreshing else { return }
+        refreshing = true
+        Task.detached(priority: .utility) {
+            let c = DiskMonitor.current()
+            await MainActor.run { DiskMonitor.shared.apply(c) }
+        }
+    }
+
+    private func apply(_ c: (free: Int64, total: Int64, purgeable: Int64)) {
+        refreshing = false
+        if free != c.free { free = c.free }
+        if total != c.total { total = c.total }
+        if purgeable != c.purgeable { purgeable = c.purgeable }
         if isLow && !warned {
             warned = true
             notify()
@@ -258,7 +292,7 @@ final class CleanerModel: ObservableObject {
         let selected = items(for: pane).filter(\.isActive).sorted { priority($0) < priority($1) }
         guard !selected.isEmpty, !busy.contains(pane) else { return }
         busy.insert(pane)
-        let before = DiskMonitor.current().free
+        let before = await Task.detached { DiskMonitor.current().free }.value
         var errors: [String] = []
         var done: [String] = []
         var estimated: Int64 = 0
@@ -277,7 +311,7 @@ final class CleanerModel: ObservableObject {
             }
         }
         try? await Task.sleep(nanoseconds: 1_500_000_000)
-        let measured = max(0, DiskMonitor.current().free - before)
+        let measured = max(0, await Task.detached { DiskMonitor.current().free }.value - before)
         if !done.isEmpty {
             history.insert(HistoryEntry(date: Date(), area: pane.title, items: done, estimated: estimated, measured: measured, toTrash: trashed), at: 0)
             saveHistory()
