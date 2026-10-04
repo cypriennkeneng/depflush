@@ -113,6 +113,7 @@ final class CleanerModel: ObservableObject {
     @Published var history: [HistoryEntry] = []
     @Published var resultMessage: String?
     @Published var offerEmptyTrash = false
+    @Published var emptyingTrash = false
 
     var projectRoots: [String] {
         get {
@@ -332,12 +333,24 @@ final class CleanerModel: ObservableObject {
     }
 
     func emptyTrash() async {
+        guard !emptyingTrash else { return }
+        emptyingTrash = true
+        offerEmptyTrash = false
         status = L("Leere Papierkorb …")
+        let before = await Task.detached { DiskMonitor.current().free }.value
+        var failure: String?
         do { try await Executor.run(.emptyTrash, extraProtected: [], useTrash: false) }
-        catch { resultMessage = error.localizedDescription }
-        status = ""
+        catch { failure = error.localizedDescription }
         try? await Task.sleep(nanoseconds: 1_000_000_000)
+        let freed = max(0, await Task.detached { DiskMonitor.current().free }.value - before)
+        status = ""
+        emptyingTrash = false
         DiskMonitor.shared.refresh()
+        if let failure {
+            resultMessage = failure
+        } else if freed > 0 {
+            resultMessage = L("Papierkorb geleert. Frei geworden: %@", Fmt.bytes(freed))
+        }
     }
 
     func languageChanged() {

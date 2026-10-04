@@ -109,12 +109,10 @@ enum Executor {
             let r = await Docker.run(args, timeout: 1800)
             if r.status != 0 { throw CleanError.failed(r.err.trimmingCharacters(in: .whitespacesAndNewlines)) }
         case .emptyTrash:
-            let ok = await MainActor.run { () -> Bool in
-                var err: NSDictionary?
-                NSAppleScript(source: "tell application \"Finder\" to empty trash")?.executeAndReturnError(&err)
-                return err == nil
-            }
-            if !ok {
+            // Über osascript in einem eigenen Prozess: Der Finder kann für einen großen Papierkorb
+            // Minuten brauchen, und die App muss währenddessen bedienbar bleiben (Issue #1).
+            let r = await Shell.run("/usr/bin/osascript", ["-e", "tell application \"Finder\" to empty trash"], timeout: 3600)
+            if r.status != 0 {
                 throw CleanError.failed(L("Papierkorb konnte nicht geleert werden – bitte in Systemeinstellungen → Datenschutz → Automation den Finder erlauben."))
             }
         }

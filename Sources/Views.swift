@@ -454,7 +454,7 @@ struct FooterBar: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            if model.busy.contains(pane) {
+            if model.busy.contains(pane) || model.emptyingTrash {
                 ProgressView().controlSize(.small)
                 Text(model.status).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             } else {

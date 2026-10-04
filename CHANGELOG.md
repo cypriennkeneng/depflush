@@ -1,6 +1,7 @@
 # Changelog
 
-## Unreleased
+## 1.3.1 – 2026-10-04
+- Emptying the Trash runs in the background; the app no longer freezes while Finder empties a large Trash ([#1](https://github.com/cypriennkeneng/depflush/issues/1)), and shows how much space was freed
 - Free space now matches System Settings → Storage: it includes space macOS frees on demand (local Time Machine snapshots, iCloud copies), shown as "incl. … macOS frees when needed" ([#2](https://github.com/cypriennkeneng/depflush/issues/2))
 - Disk stats update every 10 seconds and when the window becomes active, without a rescan
 - Sizes follow the language chosen in the app (1.93 GB · 1,93 GB · 1,93 Go) instead of the system language
